@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("STUDENT") // WAS ENUM
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  attempts        Attempt[]
+  mastery         MasteryTracking[]
+  xpLogs          XpLog[]
+  badges          UserBadge[]
+  mockAttempts    MockAttempt[]
+  posts           ForumPost[]
+  flaggedAttempts FlaggedAttempt[]
+}
+
+model Subject {
+  id        String    @id @default(uuid())
+  name      String
+  chapters  Chapter[]
+  createdAt DateTime  @default(now())
+}
+
+model Chapter {
+  id        String     @id @default(uuid())
+  name      String
+  subjectId String
+  subject   Subject    @relation(fields: [subjectId], references: [id])
+  subtopics Subtopic[]
+  createdAt DateTime   @default(now())
+}
+
+model Subtopic {
+  id        String            @id @default(uuid())
+  name      String
+  chapterId String
+  chapter   Chapter           @relation(fields: [chapterId], references: [id])
+  questions Question[]
+  mastery   MasteryTracking[]
+  createdAt DateTime          @default(now())
+
+  @@index([chapterId])
+}
+
+model Question {
+  id            String     @id @default(uuid())
+  content       String // Markdown or HTML
+  options       String // WAS JSON - Stores stringified JSON
+  correctOption Int
+  explanation   String?
+  difficulty    String // WAS ENUM
+  subtopicId    String
+  subtopic      Subtopic   @relation(fields: [subtopicId], references: [id])
+  attempts      Attempt[]
+  createdAt     DateTime   @default(now())
+
+  @@index([subtopicId])
+  @@index([difficulty])
+}
+
+model Attempt {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id])
+  isCorrect  Boolean
+  timeTaken  Int // in seconds
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([questionId])
+}
+
+model MasteryTracking {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  subtopicId  String
+  subtopic    Subtopic @relation(fields: [subtopicId], references: [id])
+  masteryLevel Float    @default(0.0) // 0 to 100 or 0.0 to 1.0
+  lastTested  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, subtopicId])
+  @@index([userId])
+}
+
+model AnalyticsLog {
+  id        String   @id @default(uuid())
+  userId    String // Not strictly relational to avoid overhead, or relational if preferred
+  action    String
+  metadata  String? // WAS JSON
+  createdAt DateTime @default(now())
+}
+
+model XpLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  amount    Int
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Badge {
+  id          String      @id @default(uuid())
+  name        String
+  description String
+  iconUrl     String?
+  users       UserBadge[]
+  createdAt   DateTime    @default(now())
+}
+
+model UserBadge {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  badgeId   String
+  badge     Badge    @relation(fields: [badgeId], references: [id])
+  awardedAt DateTime @default(now())
+
+  @@unique([userId, badgeId])
+}
+
+model MockTest {
+  id        String        @id @default(uuid())
+  title     String
+  startTime DateTime
+  duration  Int // in minutes
+  questions String // WAS JSON - Array of IDs
+  attempts  MockAttempt[]
+  createdAt DateTime      @default(now())
+}
+
+model MockAttempt {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  mockTestId String
+  mockTest   MockTest @relation(fields: [mockTestId], references: [id])
+  score      Int
+  rank       Int?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([mockTestId])
+}
+
+model ForumPost {
+  id        String      @id @default(uuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  title     String
+  content   String
+  upvotes   Int         @default(0)
+  parentId  String? // For replies
+  parent    ForumPost?  @relation("PostReplies", fields: [parentId], references: [id])
+  replies   ForumPost[] @relation("PostReplies")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([userId])
+}
+
+model FlaggedAttempt {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  reason    String
+  details   String? // WAS JSON
+  createdAt DateTime @default(now())
+}
