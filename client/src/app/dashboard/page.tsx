@@ -30,7 +30,7 @@ export default function DashboardPage() {
             <Sidebar />
             <Header />
 
-            <main className="ml-64 pt-16 p-8">
+            <main className="ml-0 lg:ml-64 pt-16 p-8 transition-all">
                 <div className="max-w-7xl mx-auto space-y-8">
 
                     {/* Top Section: Welcome & Stats */}

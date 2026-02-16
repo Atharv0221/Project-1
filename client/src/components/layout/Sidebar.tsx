@@ -1,8 +1,9 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, BookOpen, Radio, Zap, MessageSquare, BarChart2, Settings, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Radio, Zap, MessageSquare, BarChart2, Settings, ShieldCheck, User } from 'lucide-react';
 
 const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
@@ -11,17 +12,35 @@ const menuItems = [
     { icon: Zap, label: 'AI Mentor', href: '/ai-mentor' },
     { icon: MessageSquare, label: 'Forum', href: '/forum' },
     { icon: BarChart2, label: 'Analytics', href: '/analytics' },
+    { icon: User, label: 'Profile', href: '/profile' },
+    { icon: Settings, label: 'Settings', href: '/settings' },
 ];
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const [isOpen, setIsOpen] = useState(true);
+
+    useEffect(() => {
+        const handleToggle = (event: any) => {
+            setIsOpen(event.detail.open);
+        };
+
+        window.addEventListener('toggleSidebar', handleToggle);
+        return () => window.removeEventListener('toggleSidebar', handleToggle);
+    }, []);
+
+    if (!isOpen) return null;
 
     return (
         <aside className="w-64 bg-[#0B1120] text-gray-400 flex flex-col h-screen border-r border-gray-800 fixed left-0 top-0 z-50">
             {/* Brand */}
             <div className="p-6 flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-tr from-cyan-400 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
-                    Y
+                <div className="w-10 h-10 flex items-center justify-center">
+                    <img
+                        src="/logo.png"
+                        alt="Yatsya Logo"
+                        className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(236,72,153,0.4)]"
+                    />
                 </div>
                 <div>
                     <h1 className="text-white font-bold text-lg leading-tight">Yatsya AI</h1>
@@ -38,8 +57,8 @@ export default function Sidebar() {
                             key={item.href}
                             href={item.href}
                             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive
-                                    ? 'bg-cyan-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.5)]'
-                                    : 'hover:bg-[#1A2333] hover:text-white'
+                                ? 'bg-cyan-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.5)]'
+                                : 'hover:bg-[#1A2333] hover:text-white'
                                 }`}
                         >
                             <item.icon size={20} className={isActive ? 'text-white' : 'text-gray-500 group-hover:text-cyan-400'} />

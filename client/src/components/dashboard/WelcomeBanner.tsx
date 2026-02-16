@@ -18,13 +18,9 @@ export default function WelcomeBanner() {
                     <span className="text-xs font-bold text-pink-500 uppercase tracking-wider">5 Day Streak</span>
                 </div>
 
-                <h1 className="text-4xl font-bold text-white mb-4">
+                <h1 className="text-4xl font-bold text-white mb-8">
                     Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">{user?.name?.split(' ')[0] || 'Student'}</span>!
                 </h1>
-
-                <p className="text-gray-400 text-lg mb-8 leading-relaxed">
-                    Your AI Mentor has analyzed yesterday's performance. You've improved your <span className="text-white font-semibold">Calculus</span> accuracy by 12%. Ready to tackle today's adaptive plan?
-                </p>
 
                 <div className="flex gap-4">
                     <Link

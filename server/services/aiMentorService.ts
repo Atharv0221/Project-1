@@ -1,7 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
 const SYSTEM_PROMPT = `You are an expert AI Learning Mentor for the Yatsya adaptive learning platform. Your role is to:
 
 1. Provide personalized study guidance and explanations
@@ -26,7 +24,13 @@ export async function generateMentorResponse(
         level?: number;
     }
 ): Promise<string> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        return "I'm currently in offline mode because my API key is missing. Please add a valid GEMINI_API_KEY to the server/.env file to enable my full capabilities!";
+    }
+
     try {
+        const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
         // Build context-aware prompt
@@ -72,7 +76,16 @@ export async function generateDailyPlan(userContext: {
     recentSubjects: string[];
     level: number;
 }): Promise<string> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        return `## Daily Plan (Offline Mode)
+1.  **Review Basic Concepts**: Focus on fundamental topics.
+2.  **Practice Problems**: Solve 5-10 problems from your textbook.
+3.  **Note**: Connect to the internet and add a valid API Key to get a personalized plan.`;
+    }
+
     try {
+        const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
         const prompt = `As an AI Learning Mentor, create a personalized daily study plan for a student with the following profile:
