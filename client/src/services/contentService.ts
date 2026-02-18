@@ -11,13 +11,19 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
     const token = useAuthStore.getState().token;
     if (token) {
-        config.headers.Authorization = `Bearer ${token} `;
+        config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
 });
 
-export const getSubjects = async () => {
-    const response = await api.get('/subjects');
+export const getStandards = async () => {
+    const response = await api.get('/standards');
+    return response.data;
+};
+
+export const getSubjects = async (standard?: string) => {
+    const url = standard ? `/subjects?standard=${standard}` : '/subjects';
+    const response = await api.get(url);
     return response.data;
 };
 

@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 export default function MockTestCard() {
     return (
         <div className="bg-[#151B2D] p-6 rounded-3xl border border-gray-800 relative overflow-hidden">
@@ -24,6 +26,12 @@ export default function MockTestCard() {
                         <span className="block text-xl font-bold text-white">38</span>
                         <span className="text-[9px] text-gray-500 uppercase">MINS</span>
                     </div>
+                </div>
+
+                <div className="mt-4">
+                    <Link href="/subjects" className="block w-full text-center py-3 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 rounded-xl text-white font-bold transition shadow-lg shadow-pink-500/20">
+                        Prepare Now
+                    </Link>
                 </div>
             </div>
         </div>

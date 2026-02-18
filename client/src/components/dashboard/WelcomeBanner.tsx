@@ -4,7 +4,7 @@ import { Flame, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '../../store/authStore';
 
-export default function WelcomeBanner() {
+export default function WelcomeBanner({ streak = 0 }) {
     const { user } = useAuthStore();
 
     return (
@@ -15,7 +15,7 @@ export default function WelcomeBanner() {
             <div className="relative z-10 max-w-2xl">
                 <div className="inline-flex items-center gap-2 bg-[#1A1F33] border border-gray-700 rounded-full px-4 py-1.5 mb-6">
                     <Flame size={14} className="text-pink-500 fill-pink-500" />
-                    <span className="text-xs font-bold text-pink-500 uppercase tracking-wider">5 Day Streak</span>
+                    <span className="text-xs font-bold text-pink-500 uppercase tracking-wider">{streak} Day Streak</span>
                 </div>
 
                 <h1 className="text-4xl font-bold text-white mb-8">

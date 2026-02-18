@@ -11,11 +11,22 @@ app.use(cors());
 import authRoutes from './routes/authRoutes.js';
 import contentRoutes from './routes/contentRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
+import quizRoutes from './routes/quizRoutes.js';
+import forumRoutes from './routes/forumRoutes.js';
+import profileRoutes from './routes/profileRoutes.js';
+import leaderboardRoutes from './routes/leaderboardRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
 
 app.use(express.json());
+app.use('/uploads', express.static('uploads')); // Serve uploaded files
 app.use('/api/auth', authRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/quiz', quizRoutes);
+app.use('/api/forum', forumRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');

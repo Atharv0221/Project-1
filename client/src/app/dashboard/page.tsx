@@ -10,7 +10,9 @@ import Header from '../../components/layout/Header';
 import WelcomeBanner from '../../components/dashboard/WelcomeBanner';
 import DailyPlan from '../../components/dashboard/DailyPlan';
 import ScholarStatus from '../../components/dashboard/ScholarStatus';
-import ProgressChart from '../../components/dashboard/ProgressChart';
+import TimeSpentGraph from '../../components/dashboard/TimeSpentGraph';
+import DifficultyCompletionGraph from '../../components/dashboard/DifficultyCompletionGraph';
+import DailyStreak from '../../components/dashboard/DailyStreak';
 import MockTestCard from '../../components/dashboard/MockTestCard';
 
 export default function DashboardPage() {
@@ -37,13 +39,19 @@ export default function DashboardPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Left Column (Hero) */}
                         <div className="lg:col-span-2 space-y-8">
-                            <WelcomeBanner />
+                            <WelcomeBanner streak={user.streak} />
                             <DailyPlan />
                         </div>
 
                         {/* Right Column (Gamification) */}
                         <div className="space-y-8">
-                            <ScholarStatus />
+                            <ScholarStatus
+                                xp={user.xp || 0}
+                                rank={0} // Need rank from API
+                                streak={user.streak || 0}
+                                levelTitle={user.scholarStatus || 'Learner'}
+                            />
+                            <DailyStreak streak={user.streak} />
                             <MockTestCard />
                         </div>
                     </div>
@@ -51,11 +59,10 @@ export default function DashboardPage() {
                     {/* Bottom Section: Charts */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div className="lg:col-span-2 h-80">
-                            <ProgressChart />
+                            <TimeSpentGraph />
                         </div>
-                        {/* Placeholder for future widget or more stats */}
-                        <div className="bg-[#151B2D] p-6 rounded-3xl border border-gray-800 flex items-center justify-center">
-                            <p className="text-gray-500 font-medium">More analytics coming soon...</p>
+                        <div className="h-80">
+                            <DifficultyCompletionGraph />
                         </div>
                     </div>
 

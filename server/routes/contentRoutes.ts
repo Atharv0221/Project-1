@@ -1,11 +1,13 @@
 import express from 'express';
-import { getSubjects, getQuestionsBySubtopic, seedContent } from '../controllers/contentController.js';
-import { authenticate, authorize } from '../middlewares/authMiddleware.js';
+import { getStandards, getSubjects, getChapters, getQuizQuestions, seedContent } from '../controllers/contentController.js';
+import { authenticate } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
+router.get('/standards', authenticate, getStandards);
 router.get('/subjects', authenticate, getSubjects);
-router.get('/questions/:subtopicId', authenticate, getQuestionsBySubtopic);
-router.post('/seed', seedContent); // Open for dev, or protect in prod
+router.get('/subjects/:subjectId/chapters', authenticate, getChapters);
+router.get('/quiz/questions', authenticate, getQuizQuestions);
+router.post('/seed', seedContent);
 
 export default router;

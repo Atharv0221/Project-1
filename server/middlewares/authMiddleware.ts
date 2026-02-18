@@ -16,8 +16,16 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
             return res.status(401).json({ message: 'No token provided' });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
-        req.userId = decoded.userId;
+        const decoded = jwt.verify(token, JWT_SECRET) as { userId?: string, id?: string, role: string };
+        const userId = decoded.userId || decoded.id;
+
+        if (!userId) {
+            res.status(401).json({ message: 'Token invalid: Missing user ID' });
+            return;
+        }
+
+        req.user = { userId: userId, role: decoded.role };
+        req.userId = userId; // Keep for backward compatibility
         next();
     } catch (error) {
         res.status(401).json({ message: 'Invalid token' });

@@ -16,6 +16,7 @@
     "react-dom": "19.2.3",
     "react-image-crop": "^11.0.10",
     "recharts": "^3.7.0",
+    "timeago.js": "^4.0.2",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

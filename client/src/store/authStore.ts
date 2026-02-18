@@ -6,6 +6,16 @@ interface User {
     name: string;
     email: string;
     role: string;
+    profilePhoto?: string;
+    streak?: number;
+    xp?: number;
+    scholarStatus?: string;
+    rankScore?: number;
+    classStandard?: string;
+    gender?: string;
+    age?: number;
+    schoolName?: string;
+    board?: string;
 }
 
 interface AuthState {

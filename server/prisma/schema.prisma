@@ -12,34 +12,48 @@ model User {
   email     String   @unique
   password  String
   name      String
-  role      String   @default("STUDENT") // WAS ENUM
+  role      String   @default("STUDENT") // "STUDENT", "ADMIN"
   
   // Profile Fields
   gender        String?
   age           Int?
-  classStandard String?
+  classStandard String? // "8", "9", "10"
   schoolName    String?
   board         String?  @default("Maharashtra State Board")
   profilePhoto  String?
+
+  // Gamification & Progress
+  streak        Int      @default(0)
+  lastLogin     DateTime?
+  xp            Int      @default(0)
+  scholarStatus String   @default("Learner") // "Learner", "Smart Scholar", "Gold Scholar", "Elite Scholar"
+  rankScore     Float    @default(0.0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
   attempts        Attempt[]
+  quizSessions    QuizSession[]
   mastery         MasteryTracking[]
   xpLogs          XpLog[]
   badges          UserBadge[]
   mockAttempts    MockAttempt[]
   posts           ForumPost[]
   flaggedAttempts FlaggedAttempt[]
+  timeTracking    TimeTracking[]
 }
 
 model Subject {
   id        String    @id @default(uuid())
   name      String
+  standard  String    // "8", "9", "10"
   chapters  Chapter[]
+  posts     ForumPost[]
+  timeLogs  TimeTracking[]
   createdAt DateTime  @default(now())
+
+  @@unique([name, standard])
 }
 
 model Chapter {
@@ -47,8 +61,25 @@ model Chapter {
   name      String
   subjectId String
   subject   Subject    @relation(fields: [subjectId], references: [id])
-  subtopics Subtopic[]
+  levels    Level[]
+  subtopics Subtopic[] // Keeping for backward compatibility if needed, else can depend on Levels
+  order     Int        @default(0)
   createdAt DateTime   @default(now())
+
+  @@unique([subjectId, name])
+}
+
+model Level {
+  id        String     @id @default(uuid())
+  name      String     // "Diagnostic", "Beginner", "Intermediate", "Advance", "Challenge"
+  order     Int        // 1, 2, 3, 4, 5
+  chapterId String
+  chapter   Chapter    @relation(fields: [chapterId], references: [id])
+  questions Question[] 
+  sessions  QuizSession[]
+  createdAt DateTime   @default(now())
+
+  @@unique([chapterId, name])
 }
 
 model Subtopic {
@@ -56,7 +87,7 @@ model Subtopic {
   name      String
   chapterId String
   chapter   Chapter           @relation(fields: [chapterId], references: [id])
-  questions Question[]
+  questions Question[] 
   mastery   MasteryTracking[]
   createdAt DateTime          @default(now())
 
@@ -66,28 +97,72 @@ model Subtopic {
 model Question {
   id            String     @id @default(uuid())
   content       String // Markdown or HTML
-  options       String // WAS JSON - Stores stringified JSON
+  options       String // JSON string
   correctOption Int
   explanation   String?
-  difficulty    String // WAS ENUM
-  subtopicId    String
-  subtopic      Subtopic   @relation(fields: [subtopicId], references: [id])
+  rightFeedback String?
+  wrongFeedback String?
+  difficulty    String // "EASY", "MEDIUM", "HARD"
+  
+  // Link to either Subtopic (old) or Level (new). 
+  // For new structure, we prefer linking to Level directly or via Subtopic if Level is subset of Subtopic (unlikely).
+  // Strategy: We can keep subtopicId nullable or just use it as a grouper.
+  // BUT the prompt says "Each Chapter -> 5 Levels". 
+  // Questions are distributed 5 Easy, 3 Medium, 2 Hard per Quiz. 
+  // It implies Questions belong to a Level? Or Questions belong to a Chapter and are tagged by Difficulty?
+  // "Each Quiz: 10 Questions ... 5 Easy, 3 Medium, 2 Hard".
+  // This implies questions are likely pooled at Chapter or Level.
+  // Let's attach questions to Level to be explicit, OR keep attaching to Subtopic (which belongs to Chapter) and filter by Difficulty.
+  // To support "Diagnostic", "Beginner", etc., maybe the Level itself is just a container for the user's progress, 
+  // and questions are pulled from the Chapter pool based on difficulty?
+  // User Prompt: "Each Chapter -> 5 Levels ... Each Quiz -> 10 Questions (5E, 3M, 2H)".
+  // This suggests the "Level" is a user progression state, NOT necessarily a bucket of questions (unless questions are specifically "Beginner Questions").
+  // However, usually questions are tagged by difficulty.
+  // Let's link Question to Subtopic (content grouping) AND likely Level (if specific).
+  // For now, I'll keep subtopicId as the primary content organizer.
+  subtopicId    String?
+  subtopic      Subtopic?  @relation(fields: [subtopicId], references: [id])
+  
+  levelId       String?    // If we want to assign questions specifically to a standard/level
+  level         Level?     @relation(fields: [levelId], references: [id])
+
   attempts      Attempt[]
   createdAt     DateTime   @default(now())
 
   @@index([subtopicId])
+  @@index([levelId])
   @@index([difficulty])
 }
 
+model QuizSession {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  levelId     String
+  level       Level     @relation(fields: [levelId], references: [id])
+  score       Float
+  startTime   DateTime  @default(now())
+  endTime     DateTime?
+  timeSpent   Int       @default(0) // Total time in seconds
+  status      String    // "IN_PROGRESS", "COMPLETED", "ABORTED"
+  tabSwitches Int       @default(0)
+  isFlagged   Boolean   @default(false)
+  
+  attempts    Attempt[] // detailed attempts in this session
+  createdAt   DateTime  @default(now())
+}
+
 model Attempt {
-  id         String   @id @default(uuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  questionId String
-  question   Question @relation(fields: [questionId], references: [id])
-  isCorrect  Boolean
-  timeTaken  Int // in seconds
-  createdAt  DateTime @default(now())
+  id            String       @id @default(uuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  quizSessionId String?
+  quizSession   QuizSession? @relation(fields: [quizSessionId], references: [id])
+  questionId    String
+  question      Question     @relation(fields: [questionId], references: [id])
+  isCorrect     Boolean
+  timeTaken     Int // in seconds
+  createdAt     DateTime     @default(now())
 
   @@index([userId])
   @@index([questionId])
@@ -99,7 +174,7 @@ model MasteryTracking {
   user        User     @relation(fields: [userId], references: [id])
   subtopicId  String
   subtopic    Subtopic @relation(fields: [subtopicId], references: [id])
-  masteryLevel Float    @default(0.0) // 0 to 100 or 0.0 to 1.0
+  masteryLevel Float    @default(0.0) // 0 to 100
   lastTested  DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -108,11 +183,23 @@ model MasteryTracking {
   @@index([userId])
 }
 
+model TimeTracking {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+  minutes   Int      @default(0)
+  date      DateTime @default(now()) // To track daily usage
+  
+  @@index([userId, subjectId])
+}
+
 model AnalyticsLog {
   id        String   @id @default(uuid())
-  userId    String // Not strictly relational to avoid overhead, or relational if preferred
+  userId    String 
   action    String
-  metadata  String? // WAS JSON
+  metadata  String?
   createdAt DateTime @default(now())
 }
 
@@ -152,7 +239,7 @@ model MockTest {
   title     String
   startTime DateTime
   duration  Int // in minutes
-  questions String // WAS JSON - Array of IDs
+  questions String // Array of IDs
   attempts  MockAttempt[]
   createdAt DateTime      @default(now())
 }
@@ -175,8 +262,11 @@ model ForumPost {
   id        String      @id @default(uuid())
   userId    String
   user      User        @relation(fields: [userId], references: [id])
+  subjectId String?
+  subject   Subject?    @relation(fields: [subjectId], references: [id])
   title     String
   content   String
+  fileUrl   String?
   upvotes   Int         @default(0)
   parentId  String? // For replies
   parent    ForumPost?  @relation("PostReplies", fields: [parentId], references: [id])
@@ -185,6 +275,7 @@ model ForumPost {
   updatedAt DateTime    @updatedAt
 
   @@index([userId])
+  @@index([subjectId])
 }
 
 model FlaggedAttempt {
@@ -192,6 +283,6 @@ model FlaggedAttempt {
   userId    String
   user      User     @relation(fields: [userId], references: [id])
   reason    String
-  details   String? // WAS JSON
+  details   String?
   createdAt DateTime @default(now())
 }
