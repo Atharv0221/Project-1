@@ -3,26 +3,37 @@
 import { useState, useEffect } from 'react';
 import { Bell, Flame, Bird, Info, Check } from 'lucide-react';
 import { getNotifications, syncNotifications, markAsRead } from '../../services/notificationService';
+import { useAuthStore } from '../../store/authStore';
 
 export default function NotificationDropdown() {
     const [notifications, setNotifications] = useState<any[]>([]);
     const [isOpen, setIsOpen] = useState(false);
+    const { token } = useAuthStore();
 
     const fetchNotifications = async () => {
+        if (!token) return;
+
         try {
             const data = await syncNotifications();
             setNotifications(data);
-        } catch (error) {
-            console.error('Error fetching notifications:', error);
+        } catch (error: any) {
+            if (error.response?.status !== 401) {
+                console.error('Error fetching notifications:', error);
+            }
         }
     };
 
     useEffect(() => {
+        if (!token) {
+            setNotifications([]);
+            return;
+        }
+
         fetchNotifications();
         // Polling every 5 minutes
         const interval = setInterval(fetchNotifications, 5 * 60 * 1000);
         return () => clearInterval(interval);
-    }, []);
+    }, [token]);
 
     const handleMarkAsRead = async (id: string) => {
         try {

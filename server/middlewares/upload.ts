@@ -1,16 +1,26 @@
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Ensure uploads directory exists
+const uploadDir = path.resolve(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 // Configure storage
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        // Use path.resolve to ensure absolute path, handling potential relative path issues
-        const uploadPath = path.resolve(__dirname, '../../uploads');
+        const uploadPath = path.resolve(__dirname, '../uploads');
+        // Ensure directory exists at runtime too (e.g. after server restart)
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
         cb(null, uploadPath);
     },
     filename: (req, file, cb) => {
@@ -21,14 +31,15 @@ const storage = multer.diskStorage({
 
 // File filter
 const fileFilter = (req: any, file: any, cb: any) => {
-    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
+    const allowedExtensions = /jpeg|jpg|png|gif|pdf/;
+    const allowedMimeTypes = /image\/(jpeg|jpg|png|gif)|application\/pdf/;
+    const extname = allowedExtensions.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedMimeTypes.test(file.mimetype);
 
     if (mimetype && extname) {
         return cb(null, true);
     } else {
-        cb(new Error('Only images and documents are allowed!'));
+        cb(new Error('Only images (JPEG, PNG, GIF) and PDF files are allowed!'));
     }
 };
 

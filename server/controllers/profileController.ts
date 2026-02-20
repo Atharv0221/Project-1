@@ -40,7 +40,7 @@ export const upgradeToPro = async (req: Request, res: Response) => {
 
     try {
         const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + 30); // 30 days subscription
+        expiryDate.setDate(expiryDate.getDate() + 180); // 180 days (6 months) subscription
 
         const user = await prisma.user.update({
             where: { id: userId },

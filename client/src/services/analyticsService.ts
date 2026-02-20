@@ -11,12 +11,14 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
     const token = useAuthStore.getState().token;
     if (token) {
-        config.headers.Authorization = `Bearer ${token} `;
+        config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
 });
 
 export const getTimeSpentAnalytics = async (subjectId?: string) => {
+    const token = useAuthStore.getState().token;
+    if (!token) return [];
     const response = await api.get('/time-spent', {
         params: { subjectId }
     });
@@ -24,11 +26,15 @@ export const getTimeSpentAnalytics = async (subjectId?: string) => {
 };
 
 export const getAccuracyTrend = async () => {
+    const token = useAuthStore.getState().token;
+    if (!token) return [];
     const response = await api.get('/accuracy-trend');
     return response.data;
 };
 
 export const getDifficultyMastery = async (subjectId?: string, chapterId?: string) => {
+    const token = useAuthStore.getState().token;
+    if (!token) return [];
     const response = await api.get('/difficulty-mastery', {
         params: { subjectId, chapterId }
     });
@@ -36,11 +42,15 @@ export const getDifficultyMastery = async (subjectId?: string, chapterId?: strin
 };
 
 export const getRankProgression = async () => {
+    const token = useAuthStore.getState().token;
+    if (!token) return [];
     const response = await api.get('/rank-progression');
     return response.data;
 };
 
 export const getZenRevisionData = async () => {
+    const token = useAuthStore.getState().token;
+    if (!token) return null;
     const response = await api.get('/zen-revision');
     return response.data;
 };

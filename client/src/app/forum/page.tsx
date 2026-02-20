@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { getPosts, createPost } from '../../services/forumService';
+import { getSubjects } from '../../services/contentService';
 import { MessageSquare, Plus, ThumbsUp, MessageCircle, ArrowLeft, Filter } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'timeago.js';
 
 export default function ForumPage() {
+    const router = useRouter();
     const [posts, setPosts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
@@ -18,6 +21,7 @@ export default function ForumPage() {
     const [filterSubject, setFilterSubject] = useState('');
     const [sortBy, setSortBy] = useState('newest');
     const [subjects, setSubjects] = useState<any[]>([]);
+    const [allSubjects, setAllSubjects] = useState<any[]>([]);
 
     // Form State
     const [title, setTitle] = useState('');
@@ -27,19 +31,30 @@ export default function ForumPage() {
 
     useEffect(() => {
         loadPosts();
+        // Load all subjects once on mount
+        getSubjects().then((data) => {
+            setAllSubjects(data);
+            setSubjects(data);
+        }).catch(console.error);
+    }, []);
+
+    // Re-run loadPosts when filters change
+    useEffect(() => {
+        loadPosts();
     }, [filterStandard, filterBoard, filterSubject, sortBy]);
 
     useEffect(() => {
-        // Load subjects when standard changes
+        // Filter subjects by selected standard (client-side)
         if (filterStandard) {
-            // Import getSubjects dynamically or move import to top if not present
-            import('../../services/contentService').then(({ getSubjects }) => {
-                getSubjects(filterStandard).then(setSubjects);
-            });
+            const filtered = allSubjects.filter(
+                (s) => String(s.standard) === String(filterStandard)
+            );
+            setSubjects(filtered.length > 0 ? filtered : allSubjects);
         } else {
-            setSubjects([]);
+            setSubjects(allSubjects);
         }
-    }, [filterStandard]);
+        setFilterSubject(''); // reset subject when standard changes
+    }, [filterStandard, allSubjects]);
 
     const loadPosts = async () => {
         setLoading(true);
@@ -74,8 +89,9 @@ export default function ForumPage() {
             setContent('');
             setFile(null);
             loadPosts();
-        } catch (error) {
-            alert('Failed to create post');
+        } catch (error: any) {
+            const msg = error?.response?.data?.message || 'Failed to create post';
+            alert(msg);
         }
     };
 
@@ -146,7 +162,6 @@ export default function ForumPage() {
                                 value={filterSubject}
                                 onChange={(e) => setFilterSubject(e.target.value)}
                                 className="w-full bg-[#0B1120] border border-gray-700 rounded-xl p-3 text-sm focus:border-cyan-500 outline-none"
-                                disabled={!filterStandard}
                             >
                                 <option value="">All Subjects</option>
                                 {subjects.map(sub => (
@@ -175,7 +190,7 @@ export default function ForumPage() {
                 ) : (
                     <div className="space-y-4">
                         {posts.map((post) => (
-                            <Link href={`/forum/${post.id}`} key={post.id} className="block group">
+                            <div key={post.id} className="block group cursor-pointer" onClick={() => router.push(`/forum/${post.id}`)}>
                                 <div className="bg-[#151B2D] border border-gray-800 rounded-2xl p-6 transition-all group-hover:border-cyan-500/50 group-hover:bg-[#1A2333]">
                                     <div className="flex gap-4">
                                         {/* Avatar */}
@@ -243,7 +258,7 @@ export default function ForumPage() {
                                         </div>
                                     </div>
                                 </div>
-                            </Link>
+                            </div>
                         ))}
 
                         {posts.length === 0 && (

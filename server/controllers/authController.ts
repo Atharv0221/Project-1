@@ -2,16 +2,31 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/db.js';
+import fs from 'fs';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 import nodemailer from 'nodemailer';
 
-// Configure Nodemailer (Use environment variables in production)
+// Configure Nodemailer (Using environment variables)
 const transporter = nodemailer.createTransport({
-    service: 'gmail', // Or your preferred service
+    service: 'gmail', // Standard for Gmail
     auth: {
-        user: process.env.EMAIL_USER || 'your-email@gmail.com', // Replace with valid credentials or env vars
-        pass: process.env.EMAIL_PASS || 'your-password'
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
+console.log('Initializing SMTP with user:', process.env.EMAIL_USER);
+
+// Verify connection configuration
+transporter.verify((error, success) => {
+    const logPath = './smtp-debug.log';
+    if (error) {
+        fs.appendFileSync(logPath, `[${new Date().toISOString()}] SMTP Connection Error: ${JSON.stringify(error)}\n`);
+        console.error('SMTP Connection Error:', error);
+    } else {
+        fs.appendFileSync(logPath, `[${new Date().toISOString()}] SMTP Server is ready\n`);
+        console.log('SMTP Server is ready to take our messages');
     }
 });
 
@@ -210,18 +225,28 @@ export const forgotPassword = async (req: Request, res: Response) => {
             text: `Your new temporary password is: ${tempPassword}\n\nPlease log in and change your password immediately.`
         };
 
-        // For this task, we will try to send, but providing the password in response for testing if email fails/is not configured
         try {
-            // await transporter.sendMail(mailOptions); // Uncomment if SMTP is configured
-            console.log(`[DEV MODE] Temp Password for ${email}: ${tempPassword}`);
+            await transporter.sendMail(mailOptions);
+            console.log(`Password reset email sent to ${email}`);
 
-            // In a real app, do NOT send the password in the response. 
-            // Here we do it because the user might not have SMTP set up and needs to test.
-            // We'll prioritize the log though.
-            res.json({ message: 'Temporary password sent to email (Check server console for dev mode)', devPass: tempPassword });
-        } catch (emailError) {
+            // In production, we don't return the password in the response.
+            // But we can include a help message.
+            res.json({
+                message: 'A temporary password has been sent to your email. Please check your inbox (and spam folder).'
+            });
+        } catch (emailError: any) {
+            const logPath = './smtp-debug.log';
+            fs.appendFileSync(logPath, `[${new Date().toISOString()}] Email Send Failed for ${email}: ${emailError.message}\n`);
             console.error('Email send failed:', emailError);
-            res.status(500).json({ message: 'Failed to send email', devPass: tempPassword });
+
+            // Log the temp password for dev fallback if sending fails
+            console.log(`[DEV FALLBACK] Temp Password for ${email}: ${tempPassword}`);
+
+            res.status(500).json({
+                message: 'Failed to send reset email. Please try again later or contact support.',
+                error: emailError.message,
+                devPass: tempPassword // Always return temp password for now to allow user to continue
+            });
         }
 
     } catch (error) {

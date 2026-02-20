@@ -35,8 +35,10 @@ export default function DifficultyCompletionGraph({ subjectId, chapterId }: { su
                 const avg = result.length > 0 ?
                     Math.round(result.reduce((acc: number, curr: any) => acc + curr.accuracy, 0) / result.length) : 0;
                 setAvgMastery(avg);
-            } catch (error) {
-                console.error('Failed to fetch difficulty mastery:', error);
+            } catch (error: any) {
+                if (error.response?.status !== 401) {
+                    console.error('Failed to fetch difficulty mastery:', error);
+                }
             } finally {
                 setLoading(false);
             }

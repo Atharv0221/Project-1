@@ -11,10 +11,7 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
     const token = useAuthStore.getState().token;
     if (token) {
-        // console.log('Attaching token to request:', config.url);
         config.headers.Authorization = `Bearer ${token}`;
-    } else {
-        console.warn('No token found in store for request:', config.url);
     }
     return config;
 });
@@ -31,6 +28,8 @@ export const getSubjects = async (standard?: string) => {
 };
 
 export const getQuestionsBySubtopic = async (subtopicId: string) => {
+    const token = useAuthStore.getState().token;
+    if (!token) return [];
     const response = await api.get(`/questions/${subtopicId}`);
     return response.data;
 };

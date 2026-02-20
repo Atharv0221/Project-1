@@ -24,6 +24,12 @@ export default function Sidebar() {
     const { user, login, token } = useAuthStore();
     const [upgrading, setUpgrading] = useState(false);
 
+    // Dynamic menu items based on role
+    const filteredMenuItems = [...menuItems];
+    if (user?.role === 'ADMIN') {
+        filteredMenuItems.push({ icon: ShieldCheck, label: 'Admin Panel', href: '/admin' });
+    }
+
     const handleUpgrade = async () => {
         if (user?.isPro) return;
         setUpgrading(true);
@@ -69,7 +75,7 @@ export default function Sidebar() {
 
             {/* Navigation */}
             <nav className="flex-1 px-4 space-y-2 mt-4">
-                {menuItems.map((item) => {
+                {filteredMenuItems.map((item) => {
                     const isActive = pathname === item.href;
                     return (
                         <Link
@@ -98,7 +104,7 @@ export default function Sidebar() {
                         <ShieldCheck size={16} className="text-cyan-400" />
                     </div>
                     <p className="text-xs text-gray-400 mb-3">
-                        {user?.role === 'ADMIN' ? 'You have administrative bypass for all features.' : user?.isPro ? 'You have unlimited access to all AI features.' : 'Get unlimited access to AI Tutoring for ₹99.'}
+                        {user?.role === 'ADMIN' ? 'You have administrative bypass for all features.' : user?.isPro ? 'You have unlimited access to all AI features.' : 'Get unlimited access to AI Tutoring for ₹99 for 6 months.'}
                     </p>
                     <button
                         onClick={handleUpgrade}

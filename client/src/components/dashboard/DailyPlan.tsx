@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { TrendingDown, Zap, BookOpen, Loader2 } from 'lucide-react';
 import { getDailyPlan } from '../../services/aiService';
+import { useAuthStore } from '../../store/authStore';
 
 interface Task {
     subject: string;
@@ -16,21 +17,29 @@ export default function DailyPlan() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        const token = useAuthStore.getState().token;
+        if (!token) {
+            setLoading(false);
+            return;
+        }
+
         const fetchPlan = async () => {
             try {
                 const data = await getDailyPlan();
                 if (data.success && data.plan?.tasks) {
                     setTasks(data.plan.tasks);
                 }
-            } catch (error) {
-                console.error('Failed to fetch daily plan:', error);
+            } catch (error: any) {
+                if (error.response?.status !== 401) {
+                    console.error('Failed to fetch daily plan:', error);
+                }
             } finally {
                 setLoading(false);
             }
         };
 
         fetchPlan();
-    }, []);
+    }, [useAuthStore.getState().token]);
 
     const getIcon = (type: string) => {
         switch (type.toLowerCase()) {

@@ -45,11 +45,19 @@ export default function DashboardPage() {
         };
 
         const fetchReports = async () => {
+            const token = useAuthStore.getState().token;
+            if (!token) {
+                setLoadingReports(false);
+                return;
+            }
+
             try {
                 const data = await getQuizReports();
                 setReports(data || []);
-            } catch (error) {
-                console.error('Failed to fetch reports:', error);
+            } catch (error: any) {
+                if (error.response?.status !== 401) {
+                    console.error('Failed to fetch reports:', error);
+                }
             } finally {
                 setLoadingReports(false);
             }

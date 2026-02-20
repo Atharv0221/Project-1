@@ -61,7 +61,7 @@ export default function ProPlanCard() {
                         <h2 className="text-2xl font-bold text-white tracking-tight">Yatsya Pro Plan</h2>
                     </div>
                     <div className="ml-auto bg-cyan-500/10 border border-cyan-500/20 px-3 py-1 rounded-full">
-                        <span className="text-xs font-bold text-cyan-400">₹99/mo</span>
+                        <span className="text-xs font-bold text-cyan-400">₹99/6mo</span>
                     </div>
                 </div>
 
@@ -104,13 +104,13 @@ export default function ProPlanCard() {
                         </>
                     ) : (
                         <>
-                            Upgrade Now (₹99)
+                            Upgrade Now (₹99 for 6 months)
                             <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                         </>
                     )}
                 </button>
                 <p className="text-[10px] text-center text-gray-500 mt-4 leading-relaxed">
-                    By upgrading, you agree to our Terms of Service. Payment is securely processed for a 30-day billing cycle.
+                    By upgrading, you agree to our Terms of Service. Payment is securely processed for a 180-day billing cycle.
                 </p>
             </div>
         </div>

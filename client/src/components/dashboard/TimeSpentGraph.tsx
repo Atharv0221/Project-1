@@ -27,8 +27,10 @@ export default function TimeSpentGraph({ subjectId }: { subjectId?: string }) {
                     color: COLORS[index % COLORS.length]
                 }));
                 setData(chartData);
-            } catch (error) {
-                console.error('Failed to fetch time analytics:', error);
+            } catch (error: any) {
+                if (error.response?.status !== 401) {
+                    console.error('Failed to fetch time analytics:', error);
+                }
             } finally {
                 setLoading(false);
             }

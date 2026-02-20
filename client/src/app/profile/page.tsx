@@ -26,15 +26,18 @@ export default function ProfilePage() {
 
     useEffect(() => {
         const fetchProfile = async () => {
+            const token = useAuthStore.getState().token;
+            if (!token) return;
+
             try {
                 const data = await getProfile();
                 if (data) {
-                    const token = useAuthStore.getState().token;
-                    login(data, token!);
+                    login(data, token);
                 }
             } catch (error: any) {
-                console.error('Failed to fetch profile:', error);
-                // Don't show error message to user on mount to avoid annoyance
+                if (error.response?.status !== 401) {
+                    console.error('Failed to fetch profile:', error);
+                }
             }
         };
 
