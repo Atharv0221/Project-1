@@ -21,7 +21,7 @@ services:
   # Frontend Service (Next.js)
   - type: web
     name: yatsya-frontend
-    env: nextjs
+    env: node
     rootDir: client
     buildCommand: npm install && npm run build
     startCommand: npm start
