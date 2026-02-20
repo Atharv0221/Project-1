@@ -18,8 +18,12 @@ async function main() {
 
             console.log(`  - Level: ${lvl.name}`);
 
-            // Delete existing questions for this level to ensure clean state with new structure
-            await prisma.question.deleteMany({ where: { levelId: level.id } });
+            // Check if level already has questions to avoid redundant operations on every build
+            const existingCount = await prisma.question.count({ where: { levelId: level.id } });
+            if (existingCount > 0) {
+                console.log(`    (Skipping ${existingCount} existing questions)`);
+                continue;
+            }
 
             for (const q of lvl.questions) {
                 await prisma.question.create({
