@@ -5,7 +5,7 @@ services:
     plan: free
     env: node
     rootDir: server
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && npm run build && npx prisma migrate deploy
     startCommand: npm start
     envVars:
       - key: DATABASE_URL
@@ -14,10 +14,20 @@ services:
           property: connectionString
       - key: PORT
         value: 5000
+      - key: NPM_CONFIG_PRODUCTION
+        value: false
       - key: JWT_SECRET
         generateValue: true
       - key: NODE_ENV
         value: production
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
 
   # Frontend Service (Next.js)
   - type: web
@@ -32,7 +42,8 @@ services:
         fromService:
           type: web
           name: yatsya-backend
-          property: host
+          property: url
+
 
 databases:
   - name: yatsya-db
