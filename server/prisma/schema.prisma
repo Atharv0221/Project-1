@@ -28,6 +28,10 @@ model User {
   xp            Int      @default(0)
   scholarStatus String   @default("Learner") // "Learner", "Smart Scholar", "Gold Scholar", "Elite Scholar"
   rankScore     Float    @default(0.0)
+  
+  // Pro Plan Fields
+  isPro              Boolean   @default(false)
+  subscriptionExpiry DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -42,6 +46,7 @@ model User {
   posts           ForumPost[]
   flaggedAttempts FlaggedAttempt[]
   timeTracking    TimeTracking[]
+  notifications   Notification[]
 }
 
 model Subject {
@@ -61,6 +66,7 @@ model Chapter {
   name      String
   subjectId String
   subject   Subject    @relation(fields: [subjectId], references: [id])
+  youtubeLink String?
   levels    Level[]
   subtopics Subtopic[] // Keeping for backward compatibility if needed, else can depend on Levels
   order     Int        @default(0)
@@ -147,6 +153,8 @@ model QuizSession {
   status      String    // "IN_PROGRESS", "COMPLETED", "ABORTED"
   tabSwitches Int       @default(0)
   isFlagged   Boolean   @default(false)
+  aiFeedback  String?   // AI generated feedback on the session
+  recommendations String? // AI generated recommendations (youtube links, subtopics)
   
   attempts    Attempt[] // detailed attempts in this session
   createdAt   DateTime  @default(now())
@@ -285,4 +293,17 @@ model FlaggedAttempt {
   reason    String
   details   String?
   createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  type      String   // "REMINDER", "STREAK", "NUDGE", "INFO"
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }

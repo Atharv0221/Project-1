@@ -3,34 +3,76 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Trophy, Clock, Target, ArrowRight, Home, RefreshCw, BarChart3, Star } from 'lucide-react';
+import { Trophy, Clock, Target, ArrowRight, Home, RefreshCw, BarChart3, Star, Sparkles } from 'lucide-react';
 import { useAuthStore } from '../../../../store/authStore';
+import { getQuizSession } from '../../../../services/quizService';
 
 export default function ResultPage() {
     const params = useParams();
     const searchParams = useSearchParams();
     const router = useRouter();
     const { user } = useAuthStore();
+    const sessionId = params.id as string;
 
     const [resultData, setResultData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [aiLoading, setAiLoading] = useState(false);
 
     useEffect(() => {
         const dataStr = searchParams.get('data');
         if (dataStr) {
             try {
-                setResultData(JSON.parse(dataStr));
+                const parsedData = JSON.parse(dataStr);
+                setResultData(parsedData);
                 setLoading(false);
+
+                // Start polling if AI feedback is missing
+                if (!parsedData.aiFeedback) {
+                    setAiLoading(true);
+                }
             } catch (e) {
                 console.error("Failed to parse result data", e);
                 setLoading(false);
             }
         } else {
-            // If no data in query, maybe fetch from API?
-            // For now just show loading or redirect
             setLoading(false);
         }
     }, [searchParams]);
+
+    // Polling effect for AI Feedback
+    useEffect(() => {
+        if (!aiLoading || !sessionId) return;
+
+        let pollCount = 0;
+        const maxPolls = 15; // Max 30 seconds
+
+        const poll = async () => {
+            try {
+                const session = await getQuizSession(sessionId);
+                if (session && session.aiFeedback) {
+                    setResultData((prev: any) => ({
+                        ...prev,
+                        aiFeedback: session.aiFeedback,
+                        recommendations: session.recommendations,
+                        youtubeLink: session.level?.chapter?.youtubeLink
+                    }));
+                    setAiLoading(false);
+                } else if (pollCount >= maxPolls) {
+                    setAiLoading(false); // Stop polling after limit
+                }
+                pollCount++;
+            } catch (error) {
+                console.error("Polling error:", error);
+                setAiLoading(false);
+            }
+        };
+
+        const interval = setInterval(() => {
+            if (aiLoading) poll();
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, [aiLoading, sessionId]);
 
     if (loading) {
         return (
@@ -49,7 +91,7 @@ export default function ResultPage() {
         );
     }
 
-    const { score, xpEarned, rankScoreEarned, newStatus, message, nextLevelUnlock } = resultData;
+    const { score, xpEarned, rankScoreEarned, newStatus, message, nextLevelUnlock, aiFeedback, recommendations } = resultData;
 
     return (
         <div className="min-h-screen bg-[#0B1120] text-white p-4 md:p-8 flex items-center justify-center">
@@ -104,8 +146,90 @@ export default function ResultPage() {
                             </div>
                         </div>
 
+                        {/* AI Feedback Section */}
+                        {(aiLoading || aiFeedback || recommendations) && (
+                            <div className="bg-gradient-to-br from-[#1A2333] to-[#0B1120] border border-gray-700/50 rounded-[2.5rem] p-8 mb-12 relative overflow-hidden">
+                                <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
+                                    <div className="p-2 bg-purple-500/20 rounded-xl text-purple-400">
+                                        <Star size={20} />
+                                    </div>
+                                    AI Learning Insights
+                                    {aiLoading && (
+                                        <div className="ml-2 flex items-center gap-2">
+                                            <div className="w-4 h-4 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+                                            <span className="text-xs font-medium text-gray-500 animate-pulse">Generating...</span>
+                                        </div>
+                                    )}
+                                </h3>
+
+                                {aiLoading ? (
+                                    <div className="space-y-6">
+                                        <div className="space-y-2">
+                                            <div className="h-4 bg-gray-800 rounded w-full animate-pulse" />
+                                            <div className="h-4 bg-gray-800 rounded w-5/6 animate-pulse" />
+                                            <div className="h-4 bg-gray-800 rounded w-4/6 animate-pulse" />
+                                        </div>
+                                        <div className="h-32 bg-gray-800/50 rounded-2xl border border-gray-800 animate-pulse" />
+                                    </div>
+                                ) : (
+                                    <>
+                                        {aiFeedback && (
+                                            <div className="mb-6">
+                                                <p className="text-gray-300 leading-relaxed italic">
+                                                    "{aiFeedback}"
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {recommendations && (
+                                            <div className="bg-[#151B2D]/50 rounded-2xl p-6 border border-gray-800">
+                                                <h4 className="text-xs font-black text-cyan-400 uppercase tracking-widest mb-4">Recommended for Revision</h4>
+                                                <div className="text-gray-400 text-sm whitespace-pre-line leading-loose">
+                                                    {(recommendations as string).split('\n').map((line: string, i: number) => {
+                                                        if (line.includes('http')) {
+                                                            const parts = line.split(': ');
+                                                            return (
+                                                                <div key={i} className="mb-2">
+                                                                    <span className="text-gray-300">{parts[0]}</span>
+                                                                    <a href={parts[1]} target="_blank" rel="noopener noreferrer" className="ml-2 text-cyan-400 hover:underline">
+                                                                        Watch Lesson
+                                                                    </a>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return <div key={i}>{line}</div>;
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        )}
+
+
                         {/* Status Update / Next Steps Section */}
                         <div className="bg-gradient-to-br from-[#1A2333] to-[#0B1120] border border-gray-700 rounded-[2rem] p-8 mb-12 relative overflow-hidden">
+
+                            {/* Recommended Revision Video */}
+                            {resultData.youtubeLink && (
+                                <div className="mb-8 p-6 bg-red-600/10 border border-red-600/30 rounded-2xl flex items-center justify-between gap-4">
+                                    <div>
+                                        <h4 className="text-red-400 font-bold mb-1">Concept Revision</h4>
+                                        <p className="text-gray-400 text-sm">Watch the full chapter playlist to strengthen your concepts.</p>
+                                    </div>
+                                    <a
+                                        href={resultData.youtubeLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl flex items-center gap-2 transition-transform active:scale-95"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                                        Watch Video
+                                    </a>
+                                </div>
+                            )}
+
                             <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
                                 <div className="flex-1 text-center md:text-left">
                                     <h3 className="text-xl font-bold mb-2">Scholar Status Updated</h3>

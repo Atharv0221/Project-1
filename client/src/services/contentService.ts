@@ -11,7 +11,10 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
     const token = useAuthStore.getState().token;
     if (token) {
+        // console.log('Attaching token to request:', config.url);
         config.headers.Authorization = `Bearer ${token}`;
+    } else {
+        console.warn('No token found in store for request:', config.url);
     }
     return config;
 });

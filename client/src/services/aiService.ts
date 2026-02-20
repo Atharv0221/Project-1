@@ -24,3 +24,8 @@ export const getDailyPlan = async () => {
     const response = await api.get('/daily-plan');
     return response.data;
 };
+
+export const fetchRemediation = async (questionId: string, type: 'UPGRADE' | 'DOWNGRADE') => {
+    const response = await api.post('/remediation', { questionId, type });
+    return response.data;
+};

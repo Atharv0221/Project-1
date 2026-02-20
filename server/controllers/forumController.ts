@@ -3,23 +3,42 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Get all posts (or filtered by subject)
+// Get all posts (or filtered)
 export const getPosts = async (req: Request, res: Response) => {
-    const { subjectId } = req.query;
+    const { subjectId, standard, board, sortBy } = req.query;
 
     try {
         const where: any = {};
-        if (subjectId) where.subjectId = String(subjectId);
         where.parentId = null; // Only top-level posts
+
+        if (subjectId) where.subjectId = String(subjectId);
+
+        // Filter by Standard (User's classStandard OR Subject's standard)
+        if (standard) {
+            where.OR = [
+                { user: { classStandard: String(standard) } },
+                { subject: { standard: String(standard) } }
+            ];
+        }
+
+        // Filter by Board (User's board)
+        if (board) {
+            where.user = { ...where.user, board: String(board) };
+        }
+
+        // Sorting Logic
+        let orderBy: any = { createdAt: 'desc' }; // Default: Newest
+        if (sortBy === 'oldest') orderBy = { createdAt: 'asc' };
+        if (sortBy === 'popular') orderBy = { upvotes: 'desc' };
 
         const posts = await prisma.forumPost.findMany({
             where,
             include: {
-                user: { select: { id: true, name: true, profilePhoto: true } },
-                subject: { select: { id: true, name: true } },
+                user: { select: { id: true, name: true, profilePhoto: true, classStandard: true, board: true } },
+                subject: { select: { id: true, name: true, standard: true } },
                 _count: { select: { replies: true } }
             },
-            orderBy: { createdAt: 'desc' }
+            orderBy
         });
 
         res.json(posts);

@@ -8,14 +8,25 @@ const getAuthHeader = () => {
     return { headers: { Authorization: `Bearer ${token}` } };
 };
 
-export const getPosts = async (subjectId?: string) => {
-    const url = subjectId ? `${API_URL}/forum/posts?subjectId=${subjectId}` : `${API_URL}/forum/posts`;
-    const response = await axios.get(url, getAuthHeader());
+export const getPosts = async (filters: any = {}) => {
+    const params = new URLSearchParams();
+    if (filters.subjectId) params.append('subjectId', filters.subjectId);
+    if (filters.standard) params.append('standard', filters.standard);
+    if (filters.board) params.append('board', filters.board);
+    if (filters.sortBy) params.append('sortBy', filters.sortBy);
+
+    const response = await axios.get(`${API_URL}/forum/posts?${params.toString()}`, getAuthHeader());
     return response.data;
 };
 
-export const createPost = async (data: { title: string, content: string, subjectId?: string, fileUrl?: string }) => {
-    const response = await axios.post(`${API_URL}/forum/posts`, data, getAuthHeader());
+export const createPost = async (data: any) => {
+    // console.log('Creating post with data:', data);
+    const response = await axios.post(`${API_URL}/forum/posts`, data, {
+        headers: {
+            ...getAuthHeader().headers,
+            'Content-Type': 'multipart/form-data',
+        },
+    });
     return response.data;
 };
 

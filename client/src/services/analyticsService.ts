@@ -39,3 +39,8 @@ export const getRankProgression = async () => {
     const response = await api.get('/rank-progression');
     return response.data;
 };
+
+export const getZenRevisionData = async () => {
+    const response = await api.get('/zen-revision');
+    return response.data;
+};

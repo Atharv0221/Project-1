@@ -10,24 +10,23 @@ export default function SignupPage() {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [board, setBoard] = useState('Maharashtra State Board');
     const [error, setError] = useState('');
     const router = useRouter();
-    const { login } = useAuthStore();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
         try {
-            const response = await axios.post('http://localhost:5000/api/auth/register', {
+            await axios.post('http://localhost:5000/api/auth/register', {
                 name,
                 email,
                 password,
+                board,
             });
 
-            const { user, token } = response.data;
-            login(user, token);
-            router.push('/dashboard');
+            router.push('/login?message=Account created successfully. Please log in.');
         } catch (err: any) {
             setError(err.response?.data?.message || 'Registration failed');
         }
@@ -68,6 +67,20 @@ export default function SignupPage() {
                             className="w-full p-2 bg-gray-700 rounded border border-gray-600 focus:border-purple-500 focus:outline-none"
                             required
                         />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Educational Board</label>
+                        <select
+                            value={board}
+                            onChange={(e) => setBoard(e.target.value)}
+                            className="w-full p-2 bg-gray-700 rounded border border-gray-600 focus:border-purple-500 focus:outline-none text-white"
+                            required
+                        >
+                            <option value="Maharashtra State Board">Maharashtra State Board</option>
+                            <option value="CBSE">CBSE</option>
+                            <option value="ICSE">ICSE</option>
+                            <option value="Other">Other</option>
+                        </select>
                     </div>
                     <button
                         type="submit"

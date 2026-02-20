@@ -228,3 +228,80 @@ export const getRankProgression = async (req: Request, res: Response) => {
         res.status(500).json({ message: 'Error fetching rank progression', error });
     }
 };
+// Get Zen Zone Revision Data (Weak Topics + Key Questions)
+export const getZenRevisionData = async (req: Request, res: Response) => {
+    const userId = (req as any).user.userId;
+
+    try {
+        // 1. Fetch Top 3 Weak Topics (lowest mastery)
+        const weakAreas = await prisma.masteryTracking.findMany({
+            where: { userId },
+            orderBy: { masteryLevel: 'asc' },
+            take: 3,
+            include: {
+                subtopic: {
+                    include: {
+                        chapter: {
+                            include: { subject: true }
+                        }
+                    }
+                }
+            }
+        });
+
+        const weakTopics = weakAreas.map(w => ({
+            id: w.subtopicId,
+            name: w.subtopic.name,
+            chapter: w.subtopic.chapter.name,
+            subject: w.subtopic.chapter.subject.name,
+            mastery: Math.round(w.masteryLevel)
+        }));
+
+        // 2. Fetch 5 Important Questions (Hard difficulty from weak chapters)
+        const weakChapterIds = weakAreas.map(w => w.subtopic.chapterId);
+
+        const importantQuestions = await prisma.question.findMany({
+            where: {
+                difficulty: 'HARD',
+                level: weakChapterIds.length > 0 ? {
+                    chapterId: { in: weakChapterIds }
+                } : undefined
+            },
+            take: 5,
+            include: {
+                level: {
+                    include: { chapter: true }
+                }
+            }
+        });
+
+        const formattedQuestions = importantQuestions.map(q => ({
+            id: q.id,
+            content: q.content,
+            chapter: q.level?.chapter?.name || 'General',
+            options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+            correctOption: q.correctOption,
+            explanation: q.rightFeedback || 'Focus on the core concept.'
+        }));
+
+        res.json({
+            weakTopics: weakTopics.length > 0 ? weakTopics : [
+                { id: '1', name: 'General Review', chapter: 'Basics', subject: 'Science', mastery: 45 },
+                { id: '2', name: 'Time Management', chapter: 'Exam Prep', subject: 'Strategy', mastery: 30 }
+            ],
+            importantQuestions: formattedQuestions.length > 0 ? formattedQuestions : [
+                {
+                    id: 'm1',
+                    content: 'Which Newton’s law explains why we lean forward when a bus stops suddenly?',
+                    chapter: 'Laws of Motion',
+                    options: [{ id: 1, text: 'First Law' }, { id: 2, text: 'Second Law' }, { id: 3, text: 'Third Law' }, { id: 4, text: 'Law of Gravity' }],
+                    correctOption: 1,
+                    explanation: 'Newton’s First Law (Inertia) states an object in motion stays in motion.'
+                }
+            ]
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error fetching Zen revision data', error });
+    }
+};

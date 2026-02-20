@@ -43,7 +43,7 @@ export default function DifficultyCompletionGraph({ subjectId, chapterId }: { su
         };
 
         fetchData();
-    }, [subjectId, chapterId]);
+    }, [subjectId, chapterId, token]);
 
     if (loading) return <div className="bg-[#151B2D] p-6 rounded-3xl border border-gray-800 h-full animate-pulse" />;
 
@@ -65,8 +65,8 @@ export default function DifficultyCompletionGraph({ subjectId, chapterId }: { su
                                     data={data}
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={55}
-                                    outerRadius={75}
+                                    innerRadius={45}
+                                    outerRadius={65}
                                     paddingAngle={5}
                                     dataKey="value"
                                     stroke="none"

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getPosts, createPost } from '../../services/forumService';
-import { MessageSquare, Plus, ThumbsUp, MessageCircle, ArrowLeft } from 'lucide-react';
+import { MessageSquare, Plus, ThumbsUp, MessageCircle, ArrowLeft, Filter } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'timeago.js';
 
@@ -10,19 +10,47 @@ export default function ForumPage() {
     const [posts, setPosts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
+    const [showFilters, setShowFilters] = useState(false);
+
+    // Filter State
+    const [filterStandard, setFilterStandard] = useState('');
+    const [filterBoard, setFilterBoard] = useState('');
+    const [filterSubject, setFilterSubject] = useState('');
+    const [sortBy, setSortBy] = useState('newest');
+    const [subjects, setSubjects] = useState<any[]>([]);
 
     // Form State
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [subjectId, setSubjectId] = useState('');
+    const [file, setFile] = useState<File | null>(null);
 
     useEffect(() => {
         loadPosts();
-    }, []);
+    }, [filterStandard, filterBoard, filterSubject, sortBy]);
+
+    useEffect(() => {
+        // Load subjects when standard changes
+        if (filterStandard) {
+            // Import getSubjects dynamically or move import to top if not present
+            import('../../services/contentService').then(({ getSubjects }) => {
+                getSubjects(filterStandard).then(setSubjects);
+            });
+        } else {
+            setSubjects([]);
+        }
+    }, [filterStandard]);
 
     const loadPosts = async () => {
+        setLoading(true);
         try {
-            const data = await getPosts();
+            const filters = {
+                standard: filterStandard,
+                board: filterBoard,
+                subjectId: filterSubject,
+                sortBy
+            };
+            const data = await getPosts(filters);
             setPosts(data);
         } catch (error) {
             console.error(error);
@@ -34,10 +62,17 @@ export default function ForumPage() {
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await createPost({ title, content, subjectId: subjectId || undefined }); // Optional subject
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('content', content);
+            if (subjectId) formData.append('subjectId', subjectId);
+            if (file) formData.append('file', file);
+
+            await createPost(formData);
             setShowCreate(false);
             setTitle('');
             setContent('');
+            setFile(null);
             loadPosts();
         } catch (error) {
             alert('Failed to create post');
@@ -53,19 +88,86 @@ export default function ForumPage() {
                 </Link>
 
                 {/* Header */}
-                <div className="flex justify-between items-center mb-8">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                     <div>
                         <h1 className="text-3xl font-bold">Community Forum</h1>
                         <p className="text-gray-400">Discuss topics, ask questions, and share knowledge.</p>
                     </div>
-                    <button
-                        onClick={() => setShowCreate(true)}
-                        className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl font-bold flex items-center gap-2 hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all"
-                    >
-                        <Plus size={20} />
-                        New Post
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={`px-4 py-3 rounded-xl font-bold flex items-center gap-2 border transition-all ${showFilters ? 'bg-cyan-500/10 border-cyan-500 text-cyan-400' : 'bg-[#151B2D] border-gray-700 text-gray-400 hover:text-white'}`}
+                        >
+                            <Filter size={20} />
+                            Filters
+                        </button>
+                        <button
+                            onClick={() => setShowCreate(true)}
+                            className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl font-bold flex items-center gap-2 hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all"
+                        >
+                            <Plus size={20} />
+                            New Post
+                        </button>
+                    </div>
                 </div>
+
+                {/* Filters Section */}
+                {showFilters && (
+                    <div className="bg-[#151B2D] border border-gray-700 rounded-2xl p-6 mb-8 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-4">
+                        <div>
+                            <label className="text-xs text-gray-500 block mb-1">Standard</label>
+                            <select
+                                value={filterStandard}
+                                onChange={(e) => setFilterStandard(e.target.value)}
+                                className="w-full bg-[#0B1120] border border-gray-700 rounded-xl p-3 text-sm focus:border-cyan-500 outline-none"
+                            >
+                                <option value="">All Standards</option>
+                                <option value="8">8th Standard</option>
+                                <option value="9">9th Standard</option>
+                                <option value="10">10th Standard</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-500 block mb-1">Board</label>
+                            <select
+                                value={filterBoard}
+                                onChange={(e) => setFilterBoard(e.target.value)}
+                                className="w-full bg-[#0B1120] border border-gray-700 rounded-xl p-3 text-sm focus:border-cyan-500 outline-none"
+                            >
+                                <option value="">All Boards</option>
+                                <option value="Maharashtra State Board">Maharashtra State Board</option>
+                                <option value="CBSE">CBSE</option>
+                                <option value="ICSE">ICSE</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-500 block mb-1">Subject</label>
+                            <select
+                                value={filterSubject}
+                                onChange={(e) => setFilterSubject(e.target.value)}
+                                className="w-full bg-[#0B1120] border border-gray-700 rounded-xl p-3 text-sm focus:border-cyan-500 outline-none"
+                                disabled={!filterStandard}
+                            >
+                                <option value="">All Subjects</option>
+                                {subjects.map(sub => (
+                                    <option key={sub.id} value={sub.id}>{sub.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-500 block mb-1">Sort By</label>
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="w-full bg-[#0B1120] border border-gray-700 rounded-xl p-3 text-sm focus:border-cyan-500 outline-none"
+                            >
+                                <option value="newest">Newest First</option>
+                                <option value="oldest">Oldest First</option>
+                                <option value="popular">Most Popular</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
 
                 {/* Posts List */}
                 {loading ? (
@@ -106,6 +208,27 @@ export default function ForumPage() {
                                             </div>
 
                                             <p className="text-gray-400 text-sm line-clamp-2 mb-4">{post.content}</p>
+
+                                            {post.fileUrl && (
+                                                <div className="mb-4">
+                                                    {post.fileUrl.match(/\.(jpeg|jpg|png|gif)$/i) ? (
+                                                        <img src={`http://localhost:5000${post.fileUrl}`} className="max-h-64 rounded-xl border border-gray-700" alt="Attachment" />
+                                                    ) : (
+                                                        <a
+                                                            href={`http://localhost:5000${post.fileUrl}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center gap-2 p-3 bg-[#1A2333] border border-gray-700 rounded-xl text-cyan-400 hover:text-cyan-300 transition-colors w-max"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <div className="w-8 h-8 bg-red-500/10 rounded flex items-center justify-center text-red-500">
+                                                                PDF
+                                                            </div>
+                                                            <span className="text-sm font-medium">View Attachment</span>
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            )}
 
                                             <div className="flex gap-6 text-sm text-gray-500">
                                                 <div className="flex items-center gap-1">
@@ -156,8 +279,16 @@ export default function ForumPage() {
                                         value={content}
                                         onChange={(e) => setContent(e.target.value)}
                                         className="w-full h-32 bg-[#0B1120] border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:border-cyan-500"
-                                        placeholder="Describe your question or topic..."
                                         required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Attachment (Image or PDF)</label>
+                                    <input
+                                        type="file"
+                                        onChange={(e) => setFile(e.target.files?.[0] || null)}
+                                        className="w-full bg-[#0B1120] border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:border-cyan-500"
+                                        accept="image/*,.pdf"
                                     />
                                 </div>
                                 {/* Subject Select could go here if I fetched subjects */}

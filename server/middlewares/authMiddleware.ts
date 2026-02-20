@@ -10,9 +10,12 @@ interface AuthRequest extends Request {
 
 export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1];
+        const authHeader = req.headers.authorization;
+        // console.log('Auth Header:', authHeader); // Optional: verbose
+        const token = authHeader?.split(' ')[1];
 
         if (!token) {
+            console.log('Middleware: No token provided');
             return res.status(401).json({ message: 'No token provided' });
         }
 
@@ -20,6 +23,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         const userId = decoded.userId || decoded.id;
 
         if (!userId) {
+            console.log('Middleware: No userId in decoded token', decoded);
             res.status(401).json({ message: 'Token invalid: Missing user ID' });
             return;
         }
@@ -28,6 +32,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         req.userId = userId; // Keep for backward compatibility
         next();
     } catch (error) {
+        console.error('Middleware Auth Error:', error);
         res.status(401).json({ message: 'Invalid token' });
     }
 };

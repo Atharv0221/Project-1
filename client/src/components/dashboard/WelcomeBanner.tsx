@@ -1,6 +1,6 @@
 'use client';
 
-import { Flame, ArrowRight } from 'lucide-react';
+import { Flame, ArrowRight, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '../../store/authStore';
 
@@ -18,8 +18,14 @@ export default function WelcomeBanner({ streak = 0 }) {
                     <span className="text-xs font-bold text-pink-500 uppercase tracking-wider">{streak} Day Streak</span>
                 </div>
 
-                <h1 className="text-4xl font-bold text-white mb-8">
-                    Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">{user?.name?.split(' ')[0] || 'Student'}</span>!
+                <h1 className="text-4xl font-bold text-white mb-8 flex items-center gap-3">
+                    Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">{user?.name?.split(' ')[0] || 'Student'}</span>!
+                    {user?.isPro && (
+                        <div className="flex items-center gap-1.5 px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+                            <ShieldCheck size={16} className="text-cyan-400" />
+                            <span className="text-xs font-black text-cyan-400 uppercase tracking-widest">Pro</span>
+                        </div>
+                    )}
                 </h1>
 
                 <div className="flex gap-4">
@@ -30,9 +36,12 @@ export default function WelcomeBanner({ streak = 0 }) {
                         Continue Learning
                         <ArrowRight size={18} />
                     </Link>
-                    <button className="px-6 py-3 bg-[#1A2333] hover:bg-[#232D42] text-white font-semibold rounded-xl border border-gray-700 transition-all">
+                    <Link
+                        href="#reports-section"
+                        className="px-6 py-3 bg-[#1A2333] hover:bg-[#232D42] text-white font-semibold rounded-xl border border-gray-700 transition-all"
+                    >
                         View Report
-                    </button>
+                    </Link>
                 </div>
             </div>
 

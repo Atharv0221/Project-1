@@ -35,7 +35,7 @@ export default function TimeSpentGraph({ subjectId }: { subjectId?: string }) {
         };
 
         fetchData();
-    }, [subjectId]);
+    }, [subjectId, token]);
 
     if (loading) return <div className="bg-[#151B2D] p-6 rounded-3xl border border-gray-800 h-full animate-pulse" />;
 
@@ -62,8 +62,8 @@ export default function TimeSpentGraph({ subjectId }: { subjectId?: string }) {
                             />
                             <YAxis hide />
                             <Tooltip
-                                contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#fff' }}
-                                cursor={{ fill: 'transparent' }}
+                                contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                                cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
                             />
                             <Bar dataKey="minutes" radius={[4, 4, 0, 0]}>
                                 {data.map((entry, index) => (

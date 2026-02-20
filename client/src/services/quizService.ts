@@ -29,3 +29,21 @@ export const completeQuiz = async (sessionId: string) => {
     const response = await axios.post(`${API_URL}/quiz/complete`, { sessionId }, getAuthHeader());
     return response.data;
 };
+
+export const getQuizReports = async () => {
+    const response = await axios.get(`${API_URL}/quiz/reports`, getAuthHeader());
+    return response.data;
+};
+
+export const getAdaptiveQuestion = async (query: { difficulty: string, chapterId: string, sessionId: string }) => {
+    const response = await axios.get(`${API_URL}/content/adaptive-question`, {
+        ...getAuthHeader(),
+        params: query
+    });
+    return response.data;
+};
+
+export const getQuizSession = async (sessionId: string) => {
+    const response = await axios.get(`${API_URL}/quiz/session/${sessionId}`, getAuthHeader());
+    return response.data;
+};

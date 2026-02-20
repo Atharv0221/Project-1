@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { startQuiz, getQuizQuestions, submitAnswer, completeQuiz } from '../../../services/quizService';
-import { AlertTriangle, Timer, XCircle } from 'lucide-react';
+import { startQuiz, getQuizQuestions, submitAnswer, completeQuiz, getAdaptiveQuestion } from '../../../services/quizService';
+import { fetchRemediation } from '../../../services/aiService';
+import { AlertTriangle, Timer, XCircle, Sparkles, Brain, Lightbulb, GraduationCap } from 'lucide-react';
 
 export default function QuizPage() {
     const params = useParams();
@@ -100,12 +101,18 @@ export default function QuizPage() {
         };
     }, []);
 
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
+    const [remediation, setRemediation] = useState<string | null>(null);
+    const [isLoadingRemediation, setIsLoadingRemediation] = useState(false);
+
     const handleAnswer = async (optionId: number) => {
         if (!sessionId || selectedOption !== null) return; // Prevent multiple clicks
 
         setSelectedOption(optionId);
         const timeTaken = Math.round((Date.now() - questionStartTime.current) / 1000);
         const currentQ = questions[currentIndex];
+
+        setRemediation(null); // Reset for new question
 
         try {
             const res = await submitAnswer({
@@ -121,6 +128,42 @@ export default function QuizPage() {
                 correctOption: res.correctOption
             });
 
+            // --- ADAPTIVE LOGIC & REMEDIATION ---
+            if (res.adaptiveAction !== 'NONE') {
+                setIsLoadingRemediation(true);
+                fetchRemediation(currentQ.id, res.adaptiveAction)
+                    .then(data => setRemediation(data.remediation))
+                    .catch(err => console.error("Remediation fetch error:", err))
+                    .finally(() => setIsLoadingRemediation(false));
+
+                if (res.adaptiveAction === 'UPGRADE') {
+                    setToast({ message: "Leveling Up! 🚀 Skipping to Challenge Mode", type: 'success' });
+                    const challengeQ = await getAdaptiveQuestion({
+                        difficulty: 'CHALLENGE',
+                        chapterId: res.chapterId,
+                        sessionId
+                    });
+
+                    setQuestions(prev => {
+                        const nextQ = [...prev.slice(0, currentIndex + 1)];
+                        return [...nextQ, challengeQ];
+                    });
+                } else if (res.adaptiveAction === 'DOWNGRADE') {
+                    setToast({ message: "Practice makes perfect! Here is an easier one.", type: 'warning' });
+                    const easyQ = await getAdaptiveQuestion({
+                        difficulty: 'EASY',
+                        chapterId: res.chapterId,
+                        sessionId
+                    });
+                    setQuestions(prev => {
+                        const newQs = [...prev];
+                        newQs.splice(currentIndex + 1, 0, easyQ);
+                        return newQs;
+                    });
+                }
+
+                setTimeout(() => setToast(null), 3000);
+            }
         } catch (error) {
             console.error("Error submitting answer:", error);
         }
@@ -164,6 +207,17 @@ export default function QuizPage() {
 
     return (
         <div className="min-h-screen bg-[#0B1120] text-white flex flex-col select-none relative overflow-hidden">
+            {/* Adaptive Toast */}
+            {toast && (
+                <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl border shadow-2xl flex items-center gap-3 animate-bounce ${toast.type === 'success'
+                    ? 'bg-green-500/10 border-green-500/50 text-green-400'
+                    : 'bg-yellow-500/10 border-yellow-500/50 text-yellow-400'
+                    }`}>
+                    {toast.type === 'success' ? <Sparkles size={20} /> : <Brain size={20} />}
+                    <span className="font-bold">{toast.message}</span>
+                </div>
+            )}
+
             {/* Header */}
             <div className="h-16 border-b border-gray-800 flex items-center justify-between px-8 bg-[#151B2D] relative z-30">
                 <div className="flex items-center gap-4">
@@ -237,19 +291,54 @@ export default function QuizPage() {
 
             {/* Feedback Bottom Sheet ... (Keep same) */}
             <div className={`fixed bottom-0 left-0 w-full bg-[#151B2D] border-t border-gray-700 p-8 transform transition-transform duration-300 z-20 ${feedback ? 'translate-y-0' : 'translate-y-full'}`}>
-                <div className="max-w-3xl mx-auto flex items-center justify-between">
-                    <div className="pr-8">
-                        <div className={`text-xl font-bold mb-1 ${feedback?.isCorrect ? 'text-green-400' : 'text-red-400'}`}>
-                            {feedback?.isCorrect ? 'Correct Answer!' : 'Incorrect Answer'}
+                <div className="max-w-3xl mx-auto">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="pr-8">
+                            <div className={`text-xl font-bold mb-1 ${feedback?.isCorrect ? 'text-green-400' : 'text-red-400'}`}>
+                                {feedback?.isCorrect ? 'Correct Answer!' : 'Incorrect Answer'}
+                            </div>
+                            <p className="text-gray-400 line-clamp-2">{feedback?.text}</p>
                         </div>
-                        <p className="text-gray-400 line-clamp-2">{feedback?.text}</p>
+                        <button
+                            onClick={nextQuestion}
+                            className="px-8 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-xl transition-colors shrink-0"
+                        >
+                            {currentIndex < questions.length - 1 ? 'Next Question' : 'Finish Quiz'}
+                        </button>
                     </div>
-                    <button
-                        onClick={nextQuestion}
-                        className="px-8 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-xl transition-colors shrink-0"
-                    >
-                        {currentIndex < questions.length - 1 ? 'Next Question' : 'Finish Quiz'}
-                    </button>
+
+                    {/* AI Remediation Card */}
+                    {(isLoadingRemediation || remediation) && (
+                        <div className="bg-cyan-500/5 border border-cyan-500/20 rounded-2xl p-6 flex gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                            <div className="w-12 h-12 bg-cyan-500/10 rounded-full flex items-center justify-center shrink-0">
+                                {feedback?.isCorrect ? (
+                                    <GraduationCap className="text-cyan-400" size={24} />
+                                ) : (
+                                    <Lightbulb className="text-yellow-400" size={24} />
+                                )}
+                            </div>
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-sm font-bold text-cyan-400 uppercase tracking-wider">
+                                        {feedback?.isCorrect ? 'AI Deep Dive' : 'AI Micro-Lesson'}
+                                    </span>
+                                    {isLoadingRemediation && (
+                                        <div className="w-4 h-4 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+                                    )}
+                                </div>
+                                {isLoadingRemediation ? (
+                                    <div className="space-y-2">
+                                        <div className="h-4 bg-gray-800 rounded w-3/4 animate-pulse" />
+                                        <div className="h-4 bg-gray-800 rounded w-1/2 animate-pulse" />
+                                    </div>
+                                ) : (
+                                    <p className="text-gray-300 text-sm leading-relaxed">
+                                        {remediation}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

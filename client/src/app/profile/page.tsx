@@ -5,11 +5,11 @@ import { useAuthStore } from '../../store/authStore';
 import Header from '../../components/layout/Header';
 import Sidebar from '../../components/layout/Sidebar';
 import PhotoCropModal from '../../components/PhotoCropModal';
+import { getProfile, updateProfile, uploadPhotoBase64 } from '../../services/profileService';
 import { User, Save, Camera } from 'lucide-react';
-import axios from 'axios';
 
 export default function ProfilePage() {
-    const { user, login } = useAuthStore(); // login used here to update store
+    const { user, login } = useAuthStore();
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [showCropModal, setShowCropModal] = useState(false);
@@ -23,6 +23,23 @@ export default function ProfilePage() {
         board: 'Maharashtra State Board',
         profilePhoto: ''
     });
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                const data = await getProfile();
+                if (data) {
+                    const token = useAuthStore.getState().token;
+                    login(data, token!);
+                }
+            } catch (error: any) {
+                console.error('Failed to fetch profile:', error);
+                // Don't show error message to user on mount to avoid annoyance
+            }
+        };
+
+        fetchProfile();
+    }, []);
 
     useEffect(() => {
         if (user) {
@@ -44,17 +61,12 @@ export default function ProfilePage() {
 
     const handlePhotoSave = async (croppedImageUrl: string) => {
         try {
-            const token = useAuthStore.getState().token;
-            const response = await axios.post('http://localhost:5000/api/auth/upload-photo-base64', {
-                photoData: croppedImageUrl
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            setFormData({ ...formData, profilePhoto: response.data.photoUrl });
-            setMessage('Photo uploaded successfully!');
-        } catch (error) {
-            setMessage('Failed to upload photo.');
+            const data = await uploadPhotoBase64(croppedImageUrl);
+            setFormData({ ...formData, profilePhoto: data.photoUrl });
+            setMessage('Photo uploaded! Remember to click "Save Profile" to keep it.');
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || 'Failed to upload photo.';
+            setMessage(errorMsg);
             console.error(error);
         }
     };
@@ -65,20 +77,19 @@ export default function ProfilePage() {
         setMessage('');
 
         try {
-            const token = useAuthStore.getState().token;
-            const response = await axios.put('http://localhost:5000/api/auth/update-profile', {
-                userId: user?.id,
-                ...formData
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const data = await updateProfile(formData);
 
-            // Update local store with new user data
-            login(response.data.user, token!);
-            setMessage('Profile updated successfully!');
-        } catch (error) {
-            setMessage('Failed to update profile.');
-            console.error(error);
+            if (data.user) {
+                const token = useAuthStore.getState().token;
+                login(data.user, token!);
+                setMessage('Profile updated successfully!');
+            } else {
+                setMessage('Update successful, but no user data received.');
+            }
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || 'Failed to update profile. Please try again.';
+            setMessage(errorMsg);
+            console.error('Update Error:', error);
         } finally {
             setLoading(false);
         }
