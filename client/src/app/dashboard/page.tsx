@@ -78,7 +78,7 @@ export default function DashboardPage() {
                 <div className="max-w-7xl mx-auto space-y-8">
 
                     {/* Top Section: Welcome & Stats */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div id="stats-section" className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Left Column (Hero) */}
                         <div className="lg:col-span-2 space-y-8">
                             <WelcomeBanner streak={user.streak} />
@@ -99,7 +99,7 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Bottom Section: Charts */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div id="analytics-section" className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div className="lg:col-span-2 h-80">
                             <TimeSpentGraph />
                         </div>

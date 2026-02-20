@@ -20,7 +20,7 @@ function ForgotPasswordModal({ onClose }: { onClose: () => void }) {
         setError('');
 
         try {
-            const res = await axios.post('http://localhost:5000/api/auth/forgot-password', { email });
+            const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/forgot-password`, { email });
             setMessage(res.data.message);
             // In dev mode, if the password is returned, we could show it, but for now let's stick to the message
             if (res.data.devPass) {
@@ -94,7 +94,7 @@ function LoginContent() {
         setLoading(true);
 
         try {
-            const response = await axios.post('http://localhost:5000/api/auth/login', {
+            const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/login`, {
                 email,
                 password,
             });

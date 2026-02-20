@@ -227,10 +227,10 @@ export default function ForumPage() {
                                             {post.fileUrl && (
                                                 <div className="mb-4">
                                                     {post.fileUrl.match(/\.(jpeg|jpg|png|gif)$/i) ? (
-                                                        <img src={`http://localhost:5000${post.fileUrl}`} className="max-h-64 rounded-xl border border-gray-700" alt="Attachment" />
+                                                        <img src={`${process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : 'http://localhost:5000'}${post.fileUrl}`} className="max-h-64 rounded-xl border border-gray-700" alt="Attachment" />
                                                     ) : (
                                                         <a
-                                                            href={`http://localhost:5000${post.fileUrl}`}
+                                                            href={`${process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : 'http://localhost:5000'}${post.fileUrl}`}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="flex items-center gap-2 p-3 bg-[#1A2333] border border-gray-700 rounded-xl text-cyan-400 hover:text-cyan-300 transition-colors w-max"

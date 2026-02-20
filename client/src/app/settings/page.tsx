@@ -42,7 +42,7 @@ export default function SettingsPage() {
 
         try {
             const token = useAuthStore.getState().token;
-            await axios.put('http://localhost:5000/api/auth/change-password', {
+            await axios.put(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/change-password`, {
                 userId: user?.id,
                 currentPassword: passwordData.currentPassword,
                 newPassword: passwordData.newPassword

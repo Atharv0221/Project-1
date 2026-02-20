@@ -19,7 +19,7 @@ export default function SignupPage() {
         setError('');
 
         try {
-            await axios.post('http://localhost:5000/api/auth/register', {
+            await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/register`, {
                 name,
                 email,
                 password,

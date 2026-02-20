@@ -28,18 +28,18 @@ const TRACKS = [
         genre: "Lofi Hip-Hop",
         color: "from-cyan-500 to-blue-600",
         isPro: false,
-        // Royalty-free lofi from pixabay CDN
+        // Working track
         src: "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
     },
     {
         id: 2,
-        title: "Midnight Coffee",
-        artist: "Yatsya Lofi",
-        duration: "4:15",
+        title: "Lofi Girl Chill",
+        artist: "Watermello",
+        duration: "2:45",
         genre: "Chill Beats",
         color: "from-purple-500 to-pink-600",
         isPro: false,
-        src: "https://cdn.pixabay.com/audio/2022/03/15/audio_2d7e0c39fd.mp3",
+        src: "https://cdn.pixabay.com/audio/2026/02/13/audio_adff0ddee5.mp3",
     },
     {
         id: 3,
@@ -53,54 +53,54 @@ const TRACKS = [
     },
     {
         id: 4,
-        title: "Morning Pages",
-        artist: "Yatsya Lofi",
-        duration: "5:02",
+        title: "Good Night Lofi",
+        artist: "FASSounds",
+        duration: "3:20",
         genre: "Lofi Jazz",
         color: "from-orange-500 to-yellow-500",
         isPro: false,
-        src: "https://cdn.pixabay.com/audio/2024/02/28/audio_a9f84aefef.mp3",
+        src: "https://cdn.pixabay.com/audio/2023/07/30/audio_e0908e8569.mp3",
     },
     // PRO TRACKS
     {
         id: 5,
-        title: "Cherry Blossom Lane",
-        artist: "Yatsya Lofi Pro",
-        duration: "4:33",
+        title: "Cherry Blossom Beats",
+        artist: "Lofi Library",
+        duration: "4:12",
         genre: "Japanese Lofi",
         color: "from-pink-500 to-rose-600",
         isPro: true,
-        src: "https://cdn.pixabay.com/audio/2022/10/18/audio_dc96e8b929.mp3",
+        src: "https://cdn.pixabay.com/audio/2026/01/06/audio_2e752c8e21.mp3",
     },
     {
         id: 6,
-        title: "Deep Work Mode",
-        artist: "Yatsya Lofi Pro",
-        duration: "6:10",
+        title: "Coffee Chill",
+        artist: "Watermello",
+        duration: "2:55",
         genre: "Focus Flow",
         color: "from-indigo-500 to-purple-700",
         isPro: true,
-        src: "https://cdn.pixabay.com/audio/2022/11/24/audio_1e2c2d4d7f.mp3",
+        src: "https://cdn.pixabay.com/audio/2025/12/30/audio_c6c6e726a9.mp3",
     },
     {
         id: 7,
-        title: "Stellar Drift",
-        artist: "Yatsya Lofi Pro",
-        duration: "5:45",
+        title: "Stellar Ambient",
+        artist: "Watermello",
+        duration: "3:40",
         genre: "Space Lofi",
         color: "from-violet-500 to-blue-700",
         isPro: true,
-        src: "https://cdn.pixabay.com/audio/2023/02/01/audio_a96d7e0fae.mp3",
+        src: "https://cdn.pixabay.com/audio/2025/12/30/audio_6477e71e4c.mp3",
     },
     {
         id: 8,
-        title: "Monsoon Memories",
-        artist: "Yatsya Lofi Pro",
-        duration: "4:20",
+        title: "Monsoon Rain Lofi",
+        artist: "Lofi Music",
+        duration: "4:05",
         genre: "Desi Lofi",
         color: "from-teal-500 to-emerald-700",
         isPro: true,
-        src: "https://cdn.pixabay.com/audio/2022/12/20/audio_b0b72e4b5b.mp3",
+        src: "https://cdn.pixabay.com/audio/2025/12/28/audio_738b7c2f2e.mp3",
     },
 ];
 
@@ -123,10 +123,13 @@ export default function ZenZonePage() {
     const [trackProgress, setTrackProgress] = useState(0);
     const [trackDuration, setTrackDuration] = useState(0);
     const [isMuted, setIsMuted] = useState(false);
+    const [localTracks, setLocalTracks] = useState<any[]>([]);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const progressInterval = useRef<NodeJS.Timeout | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const currentTrack = TRACKS[currentTrackIdx];
+    const ALL_TRACKS = [...TRACKS, ...localTracks];
+    const currentTrack = ALL_TRACKS[currentTrackIdx] || TRACKS[0];
     const canPlay = !currentTrack.isPro || isPro;
 
     useEffect(() => {
@@ -179,7 +182,7 @@ export default function ZenZonePage() {
                 audioRef.current.play().catch(() => setIsPlaying(false));
             }
         }
-    }, [currentTrackIdx]);
+    }, [currentTrackIdx, ALL_TRACKS.length]);
 
     useEffect(() => {
         if (!audioRef.current) return;
@@ -211,7 +214,7 @@ export default function ZenZonePage() {
     }, [isPlaying]);
 
     const handlePlay = (idx: number) => {
-        const track = TRACKS[idx];
+        const track = ALL_TRACKS[idx];
         if (!track.isPro || isPro) {
             if (idx === currentTrackIdx) {
                 setIsPlaying(!isPlaying);
@@ -224,17 +227,37 @@ export default function ZenZonePage() {
     };
 
     const handlePrev = () => {
-        const newIdx = (currentTrackIdx - 1 + TRACKS.length) % TRACKS.length;
+        const newIdx = (currentTrackIdx - 1 + ALL_TRACKS.length) % ALL_TRACKS.length;
         setCurrentTrackIdx(newIdx);
         setTrackProgress(0);
         setIsPlaying(true);
     };
 
     const handleNext = () => {
-        const newIdx = (currentTrackIdx + 1) % TRACKS.length;
+        const newIdx = (currentTrackIdx + 1) % ALL_TRACKS.length;
         setCurrentTrackIdx(newIdx);
         setTrackProgress(0);
         setIsPlaying(true);
+    };
+
+    const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const url = URL.createObjectURL(file);
+            const newTrack = {
+                id: `local-${Date.now()}`,
+                title: file.name.replace(/\.[^/.]+$/, ""),
+                artist: "Your Library",
+                duration: "--:--",
+                genre: "Local File",
+                color: "from-gray-600 to-gray-800",
+                isPro: false,
+                src: url,
+            };
+            setLocalTracks((prev) => [...prev, newTrack]);
+            setCurrentTrackIdx(ALL_TRACKS.length); // Play the newly added track
+            setIsPlaying(true);
+        }
     };
 
     const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -260,6 +283,13 @@ export default function ZenZonePage() {
     return (
         <div className="min-h-screen bg-[#0B1120] text-white">
             <audio ref={audioRef} onEnded={handleNext} />
+            <input
+                type="file"
+                ref={fileInputRef}
+                onChange={onFileSelect}
+                accept="audio/*"
+                className="hidden"
+            />
             <Sidebar />
             <Header />
 
@@ -419,12 +449,20 @@ export default function ZenZonePage() {
                         <div className="space-y-8">
                             {/* Track List */}
                             <div className="bg-[#151B2D] border border-gray-800 rounded-3xl p-6">
-                                <h3 className="text-xl font-bold mb-5 flex items-center gap-2">
-                                    <BookOpen className="text-cyan-400" size={20} />
-                                    Playlist
-                                </h3>
+                                <div className="flex justify-between items-center mb-5">
+                                    <h3 className="text-xl font-bold flex items-center gap-2">
+                                        <BookOpen className="text-cyan-400" size={20} />
+                                        Playlist
+                                    </h3>
+                                    <button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="text-[10px] font-black tracking-widest uppercase bg-cyan-500/10 text-cyan-400 px-3 py-1.5 rounded-full border border-cyan-500/20 hover:bg-cyan-500 hover:text-white transition-all transform hover:scale-105"
+                                    >
+                                        + Add Local Track
+                                    </button>
+                                </div>
                                 <div className="space-y-2">
-                                    {TRACKS.map((track, idx) => {
+                                    {ALL_TRACKS.map((track, idx) => {
                                         const locked = track.isPro && !isPro;
                                         const active = idx === currentTrackIdx;
                                         return (

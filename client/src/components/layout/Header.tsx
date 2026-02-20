@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, Bell, Settings, Command, Menu, X, XCircle } from 'lucide-react';
+import { Search, Bell, Settings, Command, Menu, X, XCircle, ChevronRight } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Link from 'next/link';
 import NotificationDropdown from './NotificationDropdown';
@@ -23,6 +23,9 @@ function HeaderContent() {
     // List of searchable features
     const allFeatures = [
         { name: 'Dashboard', path: '/dashboard', icon: '🏠', keywords: ['home', 'main', 'stats'] },
+        { name: 'Learning Stats', path: '/dashboard#stats-section', icon: '📈', keywords: ['xp', 'streak', 'progress', 'scholar'] },
+        { name: 'Study Analytics', path: '/dashboard#analytics-section', icon: '📊', keywords: ['time spent', 'mastery', 'charts', 'graphs'] },
+        { name: 'Quiz Reports', path: '/dashboard#reports-section', icon: '📄', keywords: ['results', 'history', 'scores', 'reports'] },
         { name: 'AI Mentor', path: '/ai-mentor', icon: '🤖', keywords: ['chat', 'bot', 'help', 'ask'] },
         { name: 'Forum', path: '/forum', icon: '💬', keywords: ['community', 'posts', 'discussion'] },
         { name: 'Subjects', path: '/subjects', icon: '📚', keywords: ['courses', 'chapters', 'topics'] },

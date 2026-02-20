@@ -22,6 +22,8 @@
     "start": "node dist/server.js",
     "build": "tsc",
     "dev": "tsx watch server.ts",
+    "seed": "npx prisma db seed",
+    "postinstall": "prisma generate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "prisma": {

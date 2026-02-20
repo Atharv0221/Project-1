@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
-const API_URL = 'http://localhost:5000/api/profile';
+const API_URL = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/profile`;
 
 const api = axios.create({
     baseURL: API_URL,
@@ -27,7 +27,7 @@ export const updateProfile = async (data: any) => {
 
 export const uploadPhotoBase64 = async (photoData: string) => {
     const token = useAuthStore.getState().token;
-    const response = await axios.post('http://localhost:5000/api/auth/upload-photo-base64', {
+    const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/upload-photo-base64`, {
         photoData
     }, {
         headers: { Authorization: `Bearer ${token}` }
