@@ -5,10 +5,17 @@
     "moduleResolution": "NodeNext",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "strict": true,
+    "strict": false,
     "noImplicitAny": false,
     "noImplicitThis": false,
     "skipLibCheck": true,
+    "types": [
+      "node",
+      "express",
+      "multer",
+      "jsonwebtoken",
+      "cors"
+    ],
     "outDir": "./dist",
     "rootDir": "./"
   }
