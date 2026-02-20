@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, BookOpen, Sparkles, Zap, MessageSquare, BarChart2, Settings, ShieldCheck, User, CheckCircle, Loader2 } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Sparkles, Zap, MessageSquare, BarChart2, Settings, ShieldCheck, User, CheckCircle, Loader2, X } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { upgradeToPro } from '../../services/profileService';
 
