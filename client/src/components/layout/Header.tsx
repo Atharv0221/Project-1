@@ -20,6 +20,16 @@ function HeaderContent() {
     const [showResults, setShowResults] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
 
+    // Sync initial state with window width
+    useEffect(() => {
+        const checkMobile = () => {
+            setSidebarOpen(window.innerWidth >= 1024);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
     // List of searchable features
     const allFeatures = [
         { name: 'Dashboard', path: '/dashboard', icon: '🏠', keywords: ['home', 'main', 'stats'] },
