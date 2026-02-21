@@ -1,5 +1,30 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Gemini keys (same as aiMentorService)
+const geminiApiKeys = (process.env.GEMINI_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean);
+const genAIs = geminiApiKeys.map(k => new GoogleGenerativeAI(k));
+
+// Ask Gemini to explain the correct answer for a flashcard question
+async function aiExplainAnswer(question: string, correctAnswer: string): Promise<string> {
+    for (const genAI of genAIs) {
+        try {
+            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            const prompt = `You are a helpful tutor for Indian school students (Class 8-10).
+Question: "${question}"
+Correct Answer: "${correctAnswer}"
+
+Give a clear, concise explanation (2-3 sentences max) of WHY this is the correct answer. Use simple language. No bullet points, just plain text.`;
+            const result = await model.generateContent(prompt);
+            const text = result.response.text().trim();
+            if (text) return text;
+        } catch (e: any) {
+            console.warn('Gemini key failed for zen explanation:', e.message);
+        }
+    }
+    return `The correct answer is: ${correctAnswer}`;
+}
 
 // Get time spent analytics (subject-wise or chapter-wise if subjectId is provided)
 export const getTimeSpentAnalytics = async (req: Request, res: Response) => {
@@ -233,55 +258,149 @@ export const getZenRevisionData = async (req: Request, res: Response) => {
     const userId = (req as any).user.userId;
 
     try {
-        // 1. Fetch Top 3 Weak Topics (lowest mastery)
-        const weakAreas = await prisma.masteryTracking.findMany({
+        // ── 1. Compute Weak Chapters from real Attempt data ──────────────────
+        // Fetch all attempts by this user with question → level → chapter → subject
+        const allAttempts = await prisma.attempt.findMany({
             where: { userId },
-            orderBy: { masteryLevel: 'asc' },
-            take: 3,
             include: {
-                subtopic: {
+                question: {
                     include: {
-                        chapter: {
-                            include: { subject: true }
+                        level: {
+                            include: {
+                                chapter: {
+                                    include: { subject: true }
+                                }
+                            }
+                        },
+                        subtopic: {
+                            include: {
+                                chapter: {
+                                    include: { subject: true }
+                                }
+                            }
                         }
                     }
                 }
             }
         });
 
-        const weakTopics = weakAreas.map(w => ({
-            id: w.subtopicId,
-            name: w.subtopic.name,
-            chapter: w.subtopic.chapter.name,
-            subject: w.subtopic.chapter.subject.name,
-            mastery: Math.round(w.masteryLevel)
-        }));
+        // Group by chapter, compute mastery = correct / total * 100
+        const chapterMap: Record<string, {
+            id: string; name: string; subject: string; total: number; correct: number;
+        }> = {};
 
-        // 2. Fetch 5 Important Questions (Hard difficulty from weak chapters)
-        const weakChapterIds = weakAreas.map(w => w.subtopic.chapterId);
+        for (const attempt of allAttempts) {
+            const chapter = attempt.question?.level?.chapter || attempt.question?.subtopic?.chapter;
+            const subject = attempt.question?.level?.chapter?.subject || attempt.question?.subtopic?.chapter?.subject;
+            if (!chapter) continue;
+
+            if (!chapterMap[chapter.id]) {
+                chapterMap[chapter.id] = {
+                    id: chapter.id,
+                    name: chapter.name,
+                    subject: subject?.name || 'General',
+                    total: 0,
+                    correct: 0,
+                };
+            }
+            chapterMap[chapter.id].total += 1;
+            if (attempt.isCorrect) chapterMap[chapter.id].correct += 1;
+        }
+
+        // Sort by mastery ascending (weakest first), take top 3 with at least 1 attempt
+        const sortedChapters = Object.values(chapterMap)
+            .filter(c => c.total > 0)
+            .map(c => ({
+                id: c.id,
+                name: c.name,
+                chapter: c.name,
+                subject: c.subject,
+                mastery: Math.round((c.correct / c.total) * 100),
+                total: c.total,
+            }))
+            .sort((a, b) => a.mastery - b.mastery)
+            .slice(0, 3);
+
+        const weakTopics = sortedChapters.length > 0 ? sortedChapters : [
+            { id: '1', name: 'General Review', chapter: 'Basics', subject: 'Science', mastery: 45, total: 0 },
+            { id: '2', name: 'Time Management', chapter: 'Exam Prep', subject: 'Strategy', mastery: 30, total: 0 }
+        ];
+
+        // ── 2. Fetch flashcard questions from the student's weak chapters ─────
+        const weakChapterIds = sortedChapters.map(c => c.id);
 
         const importantQuestions = await prisma.question.findMany({
             where: {
                 difficulty: 'HARD',
-                level: weakChapterIds.length > 0 ? {
-                    chapterId: { in: weakChapterIds }
-                } : undefined
+                OR: [
+                    weakChapterIds.length > 0 ? { level: { chapterId: { in: weakChapterIds } } } : {},
+                    weakChapterIds.length > 0 ? { subtopic: { chapterId: { in: weakChapterIds } } } : {},
+                ]
             },
             take: 5,
             include: {
-                level: {
-                    include: { chapter: true }
-                }
+                level: { include: { chapter: true } },
+                subtopic: { include: { chapter: true } }
             }
         });
 
-        const formattedQuestions = importantQuestions.map(q => ({
-            id: q.id,
-            content: q.content,
-            chapter: q.level?.chapter?.name || 'General',
-            options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
-            correctOption: q.correctOption,
-            explanation: q.rightFeedback || 'Focus on the core concept.'
+        // Build questions with AI explanations
+        const formattedQuestions = await Promise.all(importantQuestions.map(async q => {
+            const opts: any[] = typeof q.options === 'string' ? JSON.parse(q.options) : (q.options as any[]);
+            // Find the correct answer text
+            const correctOpt = opts.find((o: any) => o.id === q.correctOption || o.id === String(q.correctOption));
+            const correctAnswerText = correctOpt?.text || opts[0]?.text || 'See explanation';
+
+            // Use AI to explain — fallback to stored rightFeedback
+            let explanation = q.rightFeedback && q.rightFeedback.trim().length > 10
+                ? q.rightFeedback
+                : await aiExplainAnswer(q.content, correctAnswerText);
+
+            return {
+                id: q.id,
+                content: q.content,
+                chapter: q.level?.chapter?.name || (q as any).subtopic?.chapter?.name || 'General',
+                options: opts,
+                correctOption: q.correctOption,
+                correctAnswerText,
+                explanation
+            };
+        }));
+
+        // If no questions from DB, use high-yield fallback questions with AI explanations
+        const fallbackRaw = [
+            {
+                id: 'f1', content: "Which Newton's law explains why we lean forward when a bus stops suddenly?",
+                options: [{ id: 1, text: "First Law" }, { id: 2, text: "Second Law" }, { id: 3, text: "Third Law" }, { id: 4, text: "Law of Gravity" }],
+                correctOption: 1, chapter: 'Laws of Motion'
+            },
+            {
+                id: 'f2', content: "What is the SI unit of electric current?",
+                options: [{ id: 1, text: "Volt" }, { id: 2, text: "Watt" }, { id: 3, text: "Ampere" }, { id: 4, text: "Ohm" }],
+                correctOption: 3, chapter: 'Electricity'
+            },
+            {
+                id: 'f3', content: "Which gas is produced during photosynthesis?",
+                options: [{ id: 1, text: "Carbon Dioxide" }, { id: 2, text: "Oxygen" }, { id: 3, text: "Nitrogen" }, { id: 4, text: "Hydrogen" }],
+                correctOption: 2, chapter: 'Life Processes'
+            },
+            {
+                id: 'f4', content: "The mirror formula is 1/f = 1/v + 1/u. What does 'f' represent?",
+                options: [{ id: 1, text: "Focal length" }, { id: 2, text: "Frequency" }, { id: 3, text: "Force" }, { id: 4, text: "Field" }],
+                correctOption: 1, chapter: 'Light'
+            },
+            {
+                id: 'f5', content: "What type of reaction is rusting of iron?",
+                options: [{ id: 1, text: "Decomposition" }, { id: 2, text: "Displacement" }, { id: 3, text: "Oxidation" }, { id: 4, text: "Neutralization" }],
+                correctOption: 3, chapter: 'Chemical Reactions'
+            }
+        ];
+
+        const fallbackWithAI = await Promise.all(fallbackRaw.map(async q => {
+            const correctOpt = q.options.find(o => o.id === q.correctOption);
+            const correctAnswerText = correctOpt?.text || '';
+            const explanation = await aiExplainAnswer(q.content, correctAnswerText);
+            return { ...q, correctAnswerText, explanation };
         }));
 
         res.json({
@@ -289,16 +408,7 @@ export const getZenRevisionData = async (req: Request, res: Response) => {
                 { id: '1', name: 'General Review', chapter: 'Basics', subject: 'Science', mastery: 45 },
                 { id: '2', name: 'Time Management', chapter: 'Exam Prep', subject: 'Strategy', mastery: 30 }
             ],
-            importantQuestions: formattedQuestions.length > 0 ? formattedQuestions : [
-                {
-                    id: 'm1',
-                    content: 'Which Newton’s law explains why we lean forward when a bus stops suddenly?',
-                    chapter: 'Laws of Motion',
-                    options: [{ id: 1, text: 'First Law' }, { id: 2, text: 'Second Law' }, { id: 3, text: 'Third Law' }, { id: 4, text: 'Law of Gravity' }],
-                    correctOption: 1,
-                    explanation: 'Newton’s First Law (Inertia) states an object in motion stays in motion.'
-                }
-            ]
+            importantQuestions: formattedQuestions.length > 0 ? formattedQuestions : fallbackWithAI
         });
     } catch (error) {
         console.error(error);

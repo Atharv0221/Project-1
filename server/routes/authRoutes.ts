@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, changePassword, forgotPassword } from '../controllers/authController.js';
+import { register, login, changePassword, forgotPassword, verifyEmail, resendVerification } from '../controllers/authController.js';
 import { uploadPhoto, uploadPhotoBase64 } from '../controllers/uploadController.js';
 import { authenticate } from '../middlewares/authMiddleware.js';
 
@@ -11,5 +11,7 @@ router.put('/change-password', authenticate, changePassword);
 router.post('/forgot-password', forgotPassword);
 router.post('/upload-photo', uploadPhoto);
 router.post('/upload-photo-base64', uploadPhotoBase64);
+router.get('/verify-email', verifyEmail);                // ← new
+router.post('/resend-verification', resendVerification); // ← new
 
 export default router;

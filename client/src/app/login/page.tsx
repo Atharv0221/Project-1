@@ -103,6 +103,11 @@ function LoginContent() {
             login(user, token);
             router.push('/dashboard');
         } catch (err: any) {
+            // If email not verified — redirect to pending page
+            if (err.response?.status === 403 && err.response?.data?.emailVerified === false) {
+                router.push(`/verify-email/pending?email=${encodeURIComponent(err.response.data.email || email)}`);
+                return;
+            }
             setError(err.response?.data?.message || 'Login failed');
         } finally {
             setLoading(false);

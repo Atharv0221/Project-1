@@ -48,6 +48,7 @@ import leaderboardRoutes from './routes/leaderboardRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import mentorRoutes from './routes/mentorRoutes.js';
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
@@ -62,6 +63,7 @@ app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/mentors', mentorRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');

@@ -33,6 +33,10 @@ model User {
   isPro              Boolean   @default(false)
   subscriptionExpiry DateTime?
 
+  // Email Verification
+  emailVerified      Boolean   @default(false)
+  verificationToken  String?   @unique
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -306,4 +310,32 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+model Mentor {
+  id             String         @id @default(uuid())
+  name           String
+  email          String         @unique
+  youtubeChannel String?
+  boards         String         // JSON array: ["CBSE","Maharashtra State Board"]
+  languages      String         // JSON array: ["English","Hindi","Marathi"]
+  standards      String         // JSON array: ["8","9","10"]
+  bio            String?
+  isActive       Boolean        @default(true)
+  ratings        MentorRating[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model MentorRating {
+  id        String   @id @default(uuid())
+  mentorId  String
+  mentor    Mentor   @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  userId    String
+  rating    Int      // 1–5
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@unique([mentorId, userId])
+  @@index([mentorId])
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, BookOpen, Sparkles, Zap, MessageSquare, BarChart2, Settings, ShieldCheck, User, CheckCircle, Loader2, X } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Sparkles, Zap, MessageSquare, BarChart2, Settings, ShieldCheck, User, CheckCircle, Loader2, X, GraduationCap } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
 const menuItems = [
@@ -11,6 +11,7 @@ const menuItems = [
     { icon: BookOpen, label: 'My Courses', href: '/subjects' },
     { icon: Sparkles, label: 'Zen Zone', href: '/zen-zone' },
     { icon: Zap, label: 'AI Mentor', href: '/ai-mentor' },
+    { icon: GraduationCap, label: 'Mentors', href: '/mentors' },
     { icon: MessageSquare, label: 'Forum', href: '/forum' },
     { icon: BarChart2, label: 'Analytics', href: '/analytics' },
     { icon: User, label: 'Profile', href: '/profile' },
