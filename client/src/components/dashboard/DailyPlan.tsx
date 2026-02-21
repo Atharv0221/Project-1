@@ -41,8 +41,8 @@ export default function DailyPlan() {
         fetchPlan();
     }, [useAuthStore.getState().token]);
 
-    const getIcon = (type: string) => {
-        switch (type.toLowerCase()) {
+    const getIcon = (type: string = 'default') => {
+        switch ((type || 'default').toLowerCase()) {
             case 'weak topic':
             case 'focus':
                 return <TrendingDown size={24} className="text-orange-500" />;
@@ -53,8 +53,8 @@ export default function DailyPlan() {
         }
     };
 
-    const getBgColor = (type: string) => {
-        switch (type.toLowerCase()) {
+    const getBgColor = (type: string = 'default') => {
+        switch ((type || 'default').toLowerCase()) {
             case 'weak topic':
             case 'focus':
                 return 'bg-orange-500/10';
@@ -65,8 +65,8 @@ export default function DailyPlan() {
         }
     };
 
-    const getLabelColor = (type: string) => {
-        switch (type.toLowerCase()) {
+    const getLabelColor = (type: string = 'default') => {
+        switch ((type || 'default').toLowerCase()) {
             case 'weak topic':
             case 'focus':
                 return 'text-orange-500';
@@ -117,15 +117,15 @@ export default function DailyPlan() {
                                 {getIcon(task.type)}
                             </div>
                             <div className="text-right">
-                                <span className="block text-2xl font-bold text-white">{task.duration}</span>
+                                <span className="block text-2xl font-bold text-white">{task.duration || '20 mins'}</span>
                                 <span className="text-[10px] text-gray-500 uppercase tracking-widest">EST. TIME</span>
                             </div>
                         </div>
                         <div>
                             <span className={`text-xs font-bold uppercase tracking-wider mb-1 block ${getLabelColor(task.type)}`}>
-                                {task.type}
+                                {task.type || 'Activity'}
                             </span>
-                            <h4 className="text-lg font-bold text-white mb-1">{task.subject}: {task.topic}</h4>
+                            <h4 className="text-lg font-bold text-white mb-1">{task.subject || 'General'}: {task.topic || 'Revision'}</h4>
                             <p className="text-sm text-gray-400">Personalized for your progress</p>
                         </div>
                     </div>

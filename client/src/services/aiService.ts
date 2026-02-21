@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
-const API_URL = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/ai`;
+const API_URL = `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000/api'}/ai/`;
 
 const api = axios.create({
     baseURL: API_URL,
@@ -21,20 +21,20 @@ api.interceptors.request.use((config) => {
 export const sendChatMessage = async (message: string, userContext?: any) => {
     const token = useAuthStore.getState().token;
     if (!token) return null;
-    const response = await api.post('/chat', { message, userContext });
+    const response = await api.post('chat', { message, userContext });
     return response.data;
 };
 
 export const getDailyPlan = async () => {
     const token = useAuthStore.getState().token;
     if (!token) return { success: false, plan: null };
-    const response = await api.get('/daily-plan');
+    const response = await api.get('daily-plan');
     return response.data;
 };
 
 export const fetchRemediation = async (questionId: string, type: 'UPGRADE' | 'DOWNGRADE') => {
     const token = useAuthStore.getState().token;
     if (!token) return null;
-    const response = await api.post('/remediation', { questionId, type });
+    const response = await api.post('remediation', { questionId, type });
     return response.data;
 };

@@ -105,7 +105,8 @@ export const generateDailyPlan = async (userContext: any) => {
     const prompt = `Generate a daily study plan for a student in Standard ${userContext?.level || 8}.
     Weak topics: ${Array.isArray(userContext?.weakTopics) ? userContext.weakTopics.join(', ') : 'None'}.
     Available Content: ${availableContentStr}
-    Format as JSON: { "tasks": [{ "subject": "Math", "topic": "Algebra", "duration": "30 mins", "type": "Practice" }] }`;
+    Format as JSON: { "tasks": [{ "subject": "Math", "topic": "Algebra", "duration": "30 mins", "type": "Practice" }] }
+    Ensure EACH task has ALL four fields: subject, topic, duration, and type.`;
 
     try {
         return await callAIProviders(
