@@ -16,7 +16,6 @@ import ScholarStatus from '../../components/dashboard/ScholarStatus';
 import TimeSpentGraph from '../../components/dashboard/TimeSpentGraph';
 import DifficultyCompletionGraph from '../../components/dashboard/DifficultyCompletionGraph';
 import DailyStreak from '../../components/dashboard/DailyStreak';
-import ProPlanCard from '../../components/dashboard/ProPlanCard';
 
 export default function DashboardPage() {
     const { user, isAuthenticated } = useAuthStore();
@@ -82,7 +81,6 @@ export default function DashboardPage() {
                         {/* Left Column (Hero) */}
                         <div className="lg:col-span-2 space-y-8">
                             <WelcomeBanner streak={user.streak} />
-                            {!user.isPro && user.role !== 'ADMIN' && <ProPlanCard />}
                             <DailyPlan />
                         </div>
 

@@ -16,8 +16,6 @@ interface User {
     age?: number;
     schoolName?: string;
     board?: string;
-    isPro?: boolean;
-    subscriptionExpiry?: string;
 }
 
 interface AuthState {

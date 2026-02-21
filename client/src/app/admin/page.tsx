@@ -175,7 +175,6 @@ export default function AdminDashboard() {
                                     <tr>
                                         <th className="px-8 py-4">User</th>
                                         <th className="px-8 py-4">Role</th>
-                                        <th className="px-8 py-4">Status</th>
                                         <th className="px-8 py-4">Joined</th>
                                         <th className="px-8 py-4 text-right">Actions</th>
                                     </tr>
@@ -186,7 +185,6 @@ export default function AdminDashboard() {
                                             <tr key={i} className="animate-pulse">
                                                 <td className="px-8 py-6"><div className="h-10 bg-gray-800 rounded-xl w-48" /></td>
                                                 <td className="px-8 py-6"><div className="h-6 bg-gray-800 rounded-lg w-20" /></td>
-                                                <td className="px-8 py-6"><div className="h-6 bg-gray-800 rounded-lg w-16" /></td>
                                                 <td className="px-8 py-6"><div className="h-6 bg-gray-800 rounded-lg w-24" /></td>
                                                 <td className="px-8 py-6 text-right"><div className="h-10 bg-gray-800 rounded-xl w-32 ml-auto" /></td>
                                             </tr>
@@ -211,12 +209,6 @@ export default function AdminDashboard() {
                                                         {u.role}
                                                     </span>
                                                 </td>
-                                                <td className="px-8 py-6">
-                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${u.isPro ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-800 text-gray-500'
-                                                        }`}>
-                                                        {u.isPro ? 'Pro' : 'Free'}
-                                                    </span>
-                                                </td>
                                                 <td className="px-8 py-6 text-sm text-gray-400">
                                                     {new Date(u.createdAt).toLocaleDateString()}
                                                 </td>
@@ -225,8 +217,8 @@ export default function AdminDashboard() {
                                                         onClick={() => handleToggleRole(u)}
                                                         disabled={updatingUserId === u.id || u.email === user.email}
                                                         className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ml-auto ${updatingUserId === u.id ? 'bg-gray-800 text-gray-500 cursor-not-allowed' :
-                                                                u.role === 'ADMIN' ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' :
-                                                                    'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white'
+                                                            u.role === 'ADMIN' ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' :
+                                                                'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white'
                                                             }`}
                                                     >
                                                         {updatingUserId === u.id ? <Loader2 size={14} className="animate-spin" /> :

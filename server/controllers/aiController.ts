@@ -21,35 +21,14 @@ export const chatWithMentor = async (req: Request, res: Response) => {
         // Fetch User and Pro status
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: { classStandard: true, name: true, isPro: true, role: true }
+            select: { classStandard: true, name: true, role: true }
         });
 
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // --- PRO LIMIT CHECK ---
-        const isAdmin = user.role === 'ADMIN';
-        if (!user.isPro && !isAdmin) {
-            const twentyFourHoursAgo = new Date();
-            twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
-
-            const chatCount = await prisma.analyticsLog.count({
-                where: {
-                    userId,
-                    action: 'CHAT_WITH_MENTOR',
-                    createdAt: { gte: twentyFourHoursAgo }
-                }
-            });
-
-            if (chatCount >= 5) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Daily free AI limit reached. Upgrade to Pro for unlimited mentoring!',
-                    limitReached: true
-                });
-            }
-        }
+        // AI Logic continues below (Limits removed for everyone)
 
         // Fetch User Context for Chat
         let enrichedContext: any = {};

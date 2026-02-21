@@ -61,7 +61,7 @@ const TRACKS = [
         isPro: false,
         src: "https://cdn.pixabay.com/audio/2023/07/30/audio_e0908e8569.mp3",
     },
-    // PRO TRACKS
+    // PRO TRACKS (NOW FREE)
     {
         id: 5,
         title: "Cherry Blossom Beats",
@@ -69,7 +69,7 @@ const TRACKS = [
         duration: "4:12",
         genre: "Japanese Lofi",
         color: "from-pink-500 to-rose-600",
-        isPro: true,
+        isPro: false,
         src: "https://cdn.pixabay.com/audio/2026/01/06/audio_2e752c8e21.mp3",
     },
     {
@@ -79,7 +79,7 @@ const TRACKS = [
         duration: "2:55",
         genre: "Focus Flow",
         color: "from-indigo-500 to-purple-700",
-        isPro: true,
+        isPro: false,
         src: "https://cdn.pixabay.com/audio/2025/12/30/audio_c6c6e726a9.mp3",
     },
     {
@@ -89,7 +89,7 @@ const TRACKS = [
         duration: "3:40",
         genre: "Space Lofi",
         color: "from-violet-500 to-blue-700",
-        isPro: true,
+        isPro: false,
         src: "https://cdn.pixabay.com/audio/2025/12/30/audio_6477e71e4c.mp3",
     },
     {
@@ -99,14 +99,14 @@ const TRACKS = [
         duration: "4:05",
         genre: "Desi Lofi",
         color: "from-teal-500 to-emerald-700",
-        isPro: true,
+        isPro: false,
         src: "https://cdn.pixabay.com/audio/2025/12/28/audio_738b7c2f2e.mp3",
     },
 ];
 
 export default function ZenZonePage() {
     const { user } = useAuthStore();
-    const isPro = user?.isPro || user?.role === 'ADMIN';
+    const isPro = true; // All users are essentially Pro now that features are free
 
     const [quoteIndex, setQuoteIndex] = useState(0);
     const [breathingStep, setBreathingStep] = useState('Inhale');
@@ -130,7 +130,7 @@ export default function ZenZonePage() {
 
     const ALL_TRACKS = [...TRACKS, ...localTracks];
     const currentTrack = ALL_TRACKS[currentTrackIdx] || TRACKS[0];
-    const canPlay = !currentTrack.isPro || isPro;
+    const canPlay = true;
 
     useEffect(() => {
         const fetchData = async () => {
@@ -214,15 +214,12 @@ export default function ZenZonePage() {
     }, [isPlaying]);
 
     const handlePlay = (idx: number) => {
-        const track = ALL_TRACKS[idx];
-        if (!track.isPro || isPro) {
-            if (idx === currentTrackIdx) {
-                setIsPlaying(!isPlaying);
-            } else {
-                setCurrentTrackIdx(idx);
-                setTrackProgress(0);
-                setIsPlaying(true);
-            }
+        if (idx === currentTrackIdx) {
+            setIsPlaying(!isPlaying);
+        } else {
+            setCurrentTrackIdx(idx);
+            setTrackProgress(0);
+            setIsPlaying(true);
         }
     };
 
@@ -370,29 +367,18 @@ export default function ZenZonePage() {
                                             <motion.div
                                                 key={i}
                                                 className="w-1.5 bg-white/80 rounded-full"
-                                                animate={isPlaying && canPlay ? {
+                                                animate={isPlaying ? {
                                                     height: [`${8 + Math.random() * 40}px`, `${8 + Math.random() * 40}px`, `${8 + Math.random() * 40}px`]
                                                 } : { height: '8px' }}
                                                 transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.07, repeatType: 'mirror' }}
                                             />
                                         ))}
                                     </div>
-                                    {!canPlay && (
-                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2 rounded-2xl">
-                                            <Lock size={20} className="text-yellow-400" />
-                                            <span className="text-yellow-400 font-bold text-sm">Pro Only</span>
-                                        </div>
-                                    )}
                                 </div>
 
                                 <div className="text-center">
                                     <div className="font-bold text-white truncate">{currentTrack.title}</div>
                                     <div className="text-xs text-gray-500">{currentTrack.artist} · {currentTrack.genre}</div>
-                                    {currentTrack.isPro && (
-                                        <div className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-yellow-500/10 border border-yellow-500/20 rounded-full text-yellow-400 text-[10px] font-bold">
-                                            <Crown size={10} /> PRO
-                                        </div>
-                                    )}
                                 </div>
 
                                 {/* Progress bar */}
@@ -463,19 +449,16 @@ export default function ZenZonePage() {
                                 </div>
                                 <div className="space-y-2">
                                     {ALL_TRACKS.map((track, idx) => {
-                                        const locked = track.isPro && !isPro;
                                         const active = idx === currentTrackIdx;
                                         return (
                                             <div
                                                 key={track.id}
                                                 onClick={() => handlePlay(idx)}
-                                                className={`flex items-center gap-3 p-3 rounded-2xl transition-all cursor-pointer ${active ? 'bg-purple-500/10 border border-purple-500/30' : 'hover:bg-white/5 border border-transparent'} ${locked ? 'opacity-60' : ''}`}
+                                                className={`flex items-center gap-3 p-3 rounded-2xl transition-all cursor-pointer ${active ? 'bg-purple-500/10 border border-purple-500/30' : 'hover:bg-white/5 border border-transparent'}`}
                                             >
                                                 {/* Mini color dot / play indicator */}
                                                 <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${track.color} flex items-center justify-center flex-shrink-0 relative`}>
-                                                    {locked ? (
-                                                        <Lock size={14} className="text-white" />
-                                                    ) : active && isPlaying ? (
+                                                    {active && isPlaying ? (
                                                         <div className="flex items-end gap-0.5 h-5">
                                                             {[...Array(4)].map((_, i) => (
                                                                 <motion.div
@@ -497,26 +480,12 @@ export default function ZenZonePage() {
                                                 </div>
 
                                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                                    {track.isPro && (
-                                                        <Crown size={12} className="text-yellow-400" />
-                                                    )}
                                                     <span className="text-xs text-gray-600">{track.duration}</span>
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
-
-                                {/* Pro upgrade banner (only for free users) */}
-                                {!isPro && (
-                                    <div className="mt-4 p-4 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-2xl flex items-center gap-3">
-                                        <Crown size={20} className="text-yellow-400 flex-shrink-0" />
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-sm font-bold text-yellow-400">Unlock 4 Pro Tracks</div>
-                                            <div className="text-xs text-gray-500">Get Pro for ₹99 for 6 months — Japanese Lofi, Space Beats & more</div>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
 
                             {/* Quote Card */}

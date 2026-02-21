@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, BookOpen, Sparkles, Zap, MessageSquare, BarChart2, Settings, ShieldCheck, User, CheckCircle, Loader2, X } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { upgradeToPro } from '../../services/profileService';
 
 const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
@@ -60,21 +59,6 @@ export default function Sidebar() {
     if (user?.role === 'ADMIN') {
         filteredMenuItems.push({ icon: ShieldCheck, label: 'Admin Panel', href: '/admin' });
     }
-
-    const handleUpgrade = async () => {
-        if (user?.isPro) return;
-        setUpgrading(true);
-        try {
-            const response = await upgradeToPro();
-            if (response.isPro) {
-                login({ ...user!, isPro: true, subscriptionExpiry: response.subscriptionExpiry }, token!);
-            }
-        } catch (error) {
-            console.error('Failed to upgrade from sidebar:', error);
-        } finally {
-            setUpgrading(false);
-        }
-    };
 
     useEffect(() => {
         const handleToggle = (event: any) => {
@@ -142,40 +126,6 @@ export default function Sidebar() {
                         );
                     })}
                 </nav>
-
-                {/* Pro Plan Card */}
-                <div className="p-4 mt-auto">
-                    <div className={`rounded-2xl p-4 border relative overflow-hidden group transition-all duration-300 ${(user?.isPro || user?.role === 'ADMIN') ? 'bg-gradient-to-br from-cyan-500/10 to-purple-500/10 border-cyan-500/30' : 'bg-[#151B2D] border-gray-800'}`}>
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-cyan-500/20 to-purple-500/20 rounded-full blur-xl -mr-4 -mt-4 transition group-hover:bg-cyan-500/30"></div>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-bold text-cyan-400 tracking-wider">
-                                {user?.role === 'ADMIN' ? 'ADMIN ACCESS' : user?.isPro ? 'PRO MEMBER' : 'PRO PLAN'}
-                            </span>
-                            <ShieldCheck size={16} className="text-cyan-400" />
-                        </div>
-                        <p className="text-xs text-gray-400 mb-3">
-                            {user?.role === 'ADMIN' ? 'You have administrative bypass for all features.' : user?.isPro ? 'You have unlimited access to all AI features.' : 'Get unlimited access to AI Tutoring for ₹99 for 6 months.'}
-                        </p>
-                        <button
-                            onClick={handleUpgrade}
-                            disabled={upgrading || user?.isPro || user?.role === 'ADMIN'}
-                            className={`w-full py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${(user?.isPro || user?.role === 'ADMIN')
-                                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 cursor-default'
-                                : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:shadow-[0_0_15px_rgba(6,182,212,0.4)]'}`}
-                        >
-                            {upgrading ? (
-                                <Loader2 size={14} className="animate-spin" />
-                            ) : (user?.isPro || user?.role === 'ADMIN') ? (
-                                <>
-                                    <CheckCircle size={14} />
-                                    Active
-                                </>
-                            ) : (
-                                'Upgrade Now'
-                            )}
-                        </button>
-                    </div>
-                </div>
             </aside>
         </>
     );

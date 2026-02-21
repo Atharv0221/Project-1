@@ -23,8 +23,6 @@ export const getProfile = async (req: Request, res: Response) => {
                 xp: true,
                 scholarStatus: true,
                 rankScore: true,
-                isPro: true,
-                subscriptionExpiry: true,
                 badges: { include: { badge: true } }
             }
         });
@@ -34,32 +32,7 @@ export const getProfile = async (req: Request, res: Response) => {
     }
 };
 
-// Upgrade User to Pro
-export const upgradeToPro = async (req: Request, res: Response) => {
-    const userId = (req as any).user.userId;
 
-    try {
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + 180); // 180 days (6 months) subscription
-
-        const user = await prisma.user.update({
-            where: { id: userId },
-            data: {
-                isPro: true,
-                subscriptionExpiry: expiryDate
-            }
-        });
-
-        res.json({
-            message: 'Successfully upgraded to Pro Plan!',
-            isPro: true,
-            subscriptionExpiry: expiryDate
-        });
-    } catch (error) {
-        console.error('Upgrade to Pro Error:', error);
-        res.status(500).json({ message: 'Error upgrading to Pro' });
-    }
-};
 
 // Update Profile
 export const updateProfile = async (req: Request, res: Response) => {

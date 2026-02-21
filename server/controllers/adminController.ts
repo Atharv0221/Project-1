@@ -30,7 +30,6 @@ export const getAllUsers = async (req: Request, res: Response) => {
                 email: true,
                 name: true,
                 role: true,
-                isPro: true,
                 createdAt: true,
                 lastLogin: true,
             },

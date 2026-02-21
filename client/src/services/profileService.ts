@@ -35,7 +35,4 @@ export const uploadPhotoBase64 = async (photoData: string) => {
     return response.data;
 };
 
-export const upgradeToPro = async () => {
-    const response = await api.post('/upgrade');
-    return response.data;
-};
+
