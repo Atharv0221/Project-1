@@ -5,7 +5,7 @@ dotenv.config();
 async function test() {
     const ollama = new Ollama({ host: process.env.OLLAMA_HOST || 'http://127.0.0.1:11434' });
     const model = process.env.OLLAMA_MODEL || 'llama3';
-    console.log(`Testing direct Ollama connection to ${ollama.config.host} with model ${model}...`);
+    console.log(`Testing direct Ollama connection to ${process.env.OLLAMA_HOST || 'http://127.0.0.1:11434'} with model ${model}...`);
     try {
         const response = await ollama.chat({
             model: model,
