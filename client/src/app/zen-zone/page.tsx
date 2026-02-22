@@ -7,6 +7,7 @@ import { getZenRevisionData } from '@/services/analyticsService';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import { useAuthStore } from '@/store/authStore';
+import Link from 'next/link';
 
 const QUOTES = [
     "You are capable of amazing things.",
@@ -517,28 +518,40 @@ export default function ZenZonePage() {
                                     <div className="space-y-4">
                                         {[1, 2, 3].map(i => <div key={i} className="h-20 bg-gray-800 rounded-2xl animate-pulse" />)}
                                     </div>
-                                ) : (
+                                ) : revisionData?.weakTopics?.length > 0 ? (
                                     <div className="space-y-4">
-                                        {revisionData?.weakTopics?.map((topic: any, idx: number) => (
+                                        <p className="text-xs text-gray-600 italic mb-2">📊 Based on your actual quiz performance</p>
+                                        {revisionData.weakTopics.map((topic: any, idx: number) => (
                                             <div key={idx} className="group p-5 bg-[#0B1120] border border-gray-800 rounded-2xl hover:border-orange-500/30 transition-all">
                                                 <div className="flex justify-between items-start mb-3">
-                                                    <div>
-                                                        <div className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-1">{topic.subject} · {topic.chapter}</div>
-                                                        <div className="text-base font-bold text-white group-hover:text-orange-400 transition-colors">{topic.name}</div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-1">{topic.subject}</div>
+                                                        <div className="text-base font-bold text-white group-hover:text-orange-400 transition-colors truncate">{topic.chapter}</div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <div className="text-sm font-bold text-gray-400">{topic.mastery}%</div>
+                                                    <div className="text-right ml-3 flex-shrink-0">
+                                                        <div className="text-sm font-black text-white">{topic.mastery}%</div>
                                                         <div className="text-[10px] text-gray-600 uppercase">Mastery</div>
+                                                        {topic.total > 0 && (
+                                                            <div className="text-[10px] text-gray-600">{topic.total} attempts</div>
+                                                        )}
                                                     </div>
                                                 </div>
-                                                <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-                                                    <div className="bg-orange-500 h-full rounded-full" style={{ width: `${topic.mastery}%` }} />
+                                                <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden mb-3">
+                                                    <div
+                                                        className={`h-full rounded-full ${topic.mastery < 40 ? 'bg-red-500' : topic.mastery < 70 ? 'bg-orange-500' : 'bg-emerald-500'}`}
+                                                        style={{ width: `${topic.mastery}%` }}
+                                                    />
                                                 </div>
                                             </div>
                                         ))}
-                                        <button className="w-full py-4 mt-2 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-orange-500 hover:text-white transition-all">
-                                            View Revision Summary <ChevronRight size={18} />
-                                        </button>
+                                        <Link href="/subjects" className="w-full py-4 mt-2 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-orange-500 hover:text-white transition-all">
+                                            Practise Weak Chapters <ChevronRight size={18} />
+                                        </Link>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8 text-gray-600 text-sm">
+                                        <div className="text-4xl mb-3">📚</div>
+                                        Complete some quizzes first — then we'll show your weakest chapters here!
                                     </div>
                                 )}
                             </div>
@@ -565,17 +578,29 @@ export default function ZenZonePage() {
                                             onClick={() => setShowAnswer(!showAnswer)}
                                         >
                                             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">
-                                                {showAnswer ? 'Correct Concept' : `Question ${currentQuestionIndex + 1} of ${revisionData?.importantQuestions?.length}`}
+                                                {showAnswer ? '✅ Correct Answer' : `Question ${currentQuestionIndex + 1} of ${revisionData?.importantQuestions?.length}`}
                                             </span>
-                                            <div className={`text-base font-bold ${showAnswer ? 'text-emerald-400' : 'text-white'}`}>
-                                                {showAnswer
-                                                    ? revisionData?.importantQuestions[currentQuestionIndex]?.explanation
-                                                    : revisionData?.importantQuestions[currentQuestionIndex]?.content}
-                                            </div>
-                                            {!showAnswer && (
-                                                <div className="mt-6 text-xs text-emerald-400 font-bold uppercase tracking-wider bg-emerald-500/10 px-4 py-2 rounded-full ring-1 ring-emerald-500/30">
-                                                    Tap to Reveal
+
+                                            {showAnswer ? (
+                                                <div className="flex flex-col items-center gap-3">
+                                                    {/* Correct answer badge */}
+                                                    <div className="px-5 py-2.5 bg-emerald-500/20 border border-emerald-500/40 rounded-xl text-emerald-300 font-black text-lg">
+                                                        {revisionData?.importantQuestions[currentQuestionIndex]?.correctAnswerText}
+                                                    </div>
+                                                    {/* AI Explanation */}
+                                                    <p className="text-gray-400 text-sm leading-relaxed mt-1">
+                                                        {revisionData?.importantQuestions[currentQuestionIndex]?.explanation}
+                                                    </p>
                                                 </div>
+                                            ) : (
+                                                <>
+                                                    <div className="text-base font-bold text-white">
+                                                        {revisionData?.importantQuestions[currentQuestionIndex]?.content}
+                                                    </div>
+                                                    <div className="mt-6 text-xs text-emerald-400 font-bold uppercase tracking-wider bg-emerald-500/10 px-4 py-2 rounded-full ring-1 ring-emerald-500/30">
+                                                        Tap to Reveal Answer
+                                                    </div>
+                                                </>
                                             )}
                                         </motion.div>
                                         <button

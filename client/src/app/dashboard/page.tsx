@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../store/authStore';
 import { getQuizReports } from '../../services/quizService';
-import { FileText, ChevronRight } from 'lucide-react';
+import { FileText, ChevronRight, Mail, X, Loader2, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 
 // Components
@@ -22,6 +22,9 @@ export default function DashboardPage() {
     const router = useRouter();
     const [reports, setReports] = useState<any[]>([]);
     const [loadingReports, setLoadingReports] = useState(true);
+    const [showVerifyBanner, setShowVerifyBanner] = useState(true);
+    const [resending, setResending] = useState(false);
+    const [resendMsg, setResendMsg] = useState('');
 
     useEffect(() => {
         if (!isAuthenticated) {
@@ -68,10 +71,48 @@ export default function DashboardPage() {
 
     if (!user) return null;
 
+    const handleResend = async () => {
+        setResending(true);
+        try {
+            await fetch('http://localhost:5000/api/auth/resend-verification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: user.email })
+            });
+            setResendMsg('✅ Verification email sent! Check your inbox.');
+        } catch { setResendMsg('Failed to send. Try again.'); }
+        finally { setResending(false); }
+    };
+
     return (
         <div className="min-h-screen bg-[#0B1120] text-white">
             <Sidebar />
             <Header />
+
+            {/* Email Verification Banner */}
+            {user.emailVerified === false && showVerifyBanner && (
+                <div className="fixed top-16 left-0 lg:left-64 right-0 z-40 flex items-center justify-between gap-4 px-6 py-3 bg-amber-500/10 border-b border-amber-500/30 backdrop-blur-sm">
+                    <div className="flex items-center gap-3 text-sm">
+                        <Mail size={16} className="text-amber-400 flex-shrink-0" />
+                        <span className="text-amber-300 font-bold">Verify your email</span>
+                        <span className="text-amber-200/70 hidden sm:block">— Check your inbox for a verification link to confirm <strong>{user.email}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {resendMsg ? (
+                            <span className="text-emerald-400 text-xs font-bold flex items-center gap-1"><CheckCircle size={12} />{resendMsg}</span>
+                        ) : (
+                            <button onClick={handleResend} disabled={resending}
+                                className="text-xs font-bold text-amber-400 border border-amber-500/40 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-black transition-all flex items-center gap-1 disabled:opacity-50">
+                                {resending ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
+                                Resend Email
+                            </button>
+                        )}
+                        <button onClick={() => setShowVerifyBanner(false)} className="text-gray-500 hover:text-white p-1">
+                            <X size={16} />
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <main className="ml-0 lg:ml-64 pt-16 p-8 transition-all">
                 <div className="max-w-7xl mx-auto space-y-8">

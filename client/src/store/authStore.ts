@@ -16,6 +16,7 @@ interface User {
     age?: number;
     schoolName?: string;
     board?: string;
+    emailVerified?: boolean;
 }
 
 interface AuthState {
