@@ -34,12 +34,14 @@ export default function DashboardPage() {
 
         // Sync profile data from server to ensure dashboard metrics (streak, xp) are fresh
         const syncProfile = async () => {
+            const token = useAuthStore.getState().token;
+            if (!token) return;
+
             try {
                 const { getProfile } = await import('../../services/profileService');
                 const data = await getProfile();
                 if (data) {
-                    const token = useAuthStore.getState().token;
-                    useAuthStore.getState().login(data, token!);
+                    useAuthStore.getState().login(data, token);
                 }
             } catch (error) {
                 console.error('Failed to sync profile on dashboard:', error);
