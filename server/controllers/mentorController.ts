@@ -63,7 +63,7 @@ export const getAllMentors = async (req: Request, res: Response) => {
 export const getMentorById = async (req: Request, res: Response) => {
     try {
         const mentor = await prisma.mentor.findUnique({
-            where: { id: req.params.id },
+            where: { id: req.params.id as string },
             include: { ratings: { orderBy: { createdAt: 'desc' } } }
         });
         if (!mentor) return res.status(404).json({ message: 'Mentor not found' });
@@ -133,7 +133,7 @@ export const updateMentor = async (req: Request, res: Response) => {
         }
 
         const mentor = await prisma.mentor.update({
-            where: { id: req.params.id },
+            where: { id: req.params.id as string },
             data: updateData,
             include: { ratings: true }
         });
@@ -146,7 +146,7 @@ export const updateMentor = async (req: Request, res: Response) => {
 // ── DELETE /api/mentors/:id  (Admin only) ───────────────────────────────────
 export const deleteMentor = async (req: Request, res: Response) => {
     try {
-        await prisma.mentor.delete({ where: { id: req.params.id } });
+        await prisma.mentor.delete({ where: { id: req.params.id as string } });
         res.json({ message: 'Mentor deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting mentor', error });
@@ -162,7 +162,7 @@ export const requestMeeting = async (req: Request, res: Response) => {
         if (!message?.trim()) return res.status(400).json({ message: 'Message is required' });
 
         const [mentor, student] = await Promise.all([
-            prisma.mentor.findUnique({ where: { id: req.params.id } }),
+            prisma.mentor.findUnique({ where: { id: req.params.id as string } }),
             prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } })
         ]);
 
@@ -207,13 +207,13 @@ export const rateMentor = async (req: Request, res: Response) => {
         if (!rating || rating < 1 || rating > 5)
             return res.status(400).json({ message: 'Rating must be between 1 and 5' });
 
-        const mentor = await prisma.mentor.findUnique({ where: { id: req.params.id } });
+        const mentor = await prisma.mentor.findUnique({ where: { id: req.params.id as string } });
         if (!mentor) return res.status(404).json({ message: 'Mentor not found' });
 
         const result = await prisma.mentorRating.upsert({
-            where: { mentorId_userId: { mentorId: req.params.id, userId } },
+            where: { mentorId_userId: { mentorId: req.params.id as string, userId } },
             update: { rating, comment },
-            create: { mentorId: req.params.id, userId, rating, comment }
+            create: { mentorId: req.params.id as string, userId, rating, comment }
         });
 
         res.json({ message: 'Rating submitted', rating: result });
