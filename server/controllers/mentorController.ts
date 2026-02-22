@@ -11,15 +11,27 @@ const transporter = nodemailer.createTransport({
 });
 
 // ── Helper: parse JSON fields ──────────────────────────────────────────────────
-const parseMentor = (m: any) => ({
-    ...m,
-    boards: JSON.parse(m.boards || '[]'),
-    languages: JSON.parse(m.languages || '[]'),
-    standards: JSON.parse(m.standards || '[]'),
-    avgRating: m.ratings?.length
-        ? Math.round((m.ratings.reduce((s: number, r: any) => s + r.rating, 0) / m.ratings.length) * 10) / 10
+const safeParseArray = (data: any) => {
+    if (!data) return [];
+    if (typeof data !== 'string') return Array.isArray(data) ? data : [data];
+    try {
+        const parsed = JSON.parse(data);
+        return Array.isArray(parsed) ? parsed : [parsed];
+    } catch (e) {
+        return [data];
+    }
+};
+
+const parseMentor = (mentor: any) => ({
+    ...mentor,
+    boards: safeParseArray(mentor.boards),
+    languages: safeParseArray(mentor.languages),
+    standards: safeParseArray(mentor.standards),
+    playlists: safeParseArray(mentor.playlists),
+    avgRating: mentor.ratings?.length
+        ? Math.round((mentor.ratings.reduce((s: number, r: any) => s + r.rating, 0) / mentor.ratings.length) * 10) / 10
         : null,
-    totalRatings: m.ratings?.length ?? 0,
+    totalRatings: mentor.ratings?.length ?? 0,
 });
 
 // ── GET /api/mentors ─────────────────────────────────────────────────────────
@@ -64,9 +76,16 @@ export const getMentorById = async (req: Request, res: Response) => {
 // ── POST /api/mentors  (Admin only) ─────────────────────────────────────────
 export const createMentor = async (req: Request, res: Response) => {
     try {
-        const { name, email, youtubeChannel, boards, languages, standards, bio } = req.body;
+        const { name, email, youtubeChannel, boards, languages, standards, playlists, bio } = req.body;
         if (!name || !email || !boards || !languages || !standards)
             return res.status(400).json({ message: 'name, email, boards, languages, standards are required' });
+
+        let profilePicture = null;
+        if (req.file) {
+            profilePicture = `/uploads/${req.file.filename}`;
+        }
+
+        const parsedPlaylists = typeof playlists === 'string' ? playlists : JSON.stringify(playlists || []);
 
         const mentor = await prisma.mentor.create({
             data: {
@@ -76,10 +95,13 @@ export const createMentor = async (req: Request, res: Response) => {
                 boards: JSON.stringify(Array.isArray(boards) ? boards : [boards]),
                 languages: JSON.stringify(Array.isArray(languages) ? languages : [languages]),
                 standards: JSON.stringify(Array.isArray(standards) ? standards : [standards]),
+                playlists: parsedPlaylists,
                 bio,
-            }
+                profilePicture,
+            },
+            include: { ratings: true }
         });
-        res.status(201).json({ ...mentor, boards, languages, standards });
+        res.status(201).json(parseMentor(mentor));
     } catch (error: any) {
         if (error.code === 'P2002') return res.status(400).json({ message: 'A mentor with this email already exists.' });
         res.status(500).json({ message: 'Error creating mentor', error });
@@ -89,17 +111,33 @@ export const createMentor = async (req: Request, res: Response) => {
 // ── PUT /api/mentors/:id  (Admin only) ──────────────────────────────────────
 export const updateMentor = async (req: Request, res: Response) => {
     try {
-        const { name, email, youtubeChannel, boards, languages, standards, bio, isActive } = req.body;
+        const { name, email, youtubeChannel, boards, languages, standards, playlists, bio, isActive } = req.body;
+
+        const updateData: any = {
+            name, email, youtubeChannel, bio,
+            ...(boards && { boards: JSON.stringify(Array.isArray(boards) ? boards : [boards]) }),
+            ...(languages && { languages: JSON.stringify(Array.isArray(languages) ? languages : [languages]) }),
+            ...(standards && { standards: JSON.stringify(Array.isArray(standards) ? standards : [standards]) }),
+        };
+
+        if (playlists !== undefined) {
+            updateData.playlists = typeof playlists === 'string' ? playlists : JSON.stringify(playlists || []);
+        }
+
+        if (isActive !== undefined) {
+            updateData.isActive = isActive === 'true' || isActive === true;
+        }
+
+        if (req.file) {
+            updateData.profilePicture = `/uploads/${req.file.filename}`;
+        }
+
         const mentor = await prisma.mentor.update({
             where: { id: req.params.id },
-            data: {
-                name, email, youtubeChannel, bio, isActive,
-                ...(boards && { boards: JSON.stringify(Array.isArray(boards) ? boards : [boards]) }),
-                ...(languages && { languages: JSON.stringify(Array.isArray(languages) ? languages : [languages]) }),
-                ...(standards && { standards: JSON.stringify(Array.isArray(standards) ? standards : [standards]) }),
-            }
+            data: updateData,
+            include: { ratings: true }
         });
-        res.json(parseMentor({ ...mentor, ratings: [] }));
+        res.json(parseMentor(mentor));
     } catch (error) {
         res.status(500).json({ message: 'Error updating mentor', error });
     }

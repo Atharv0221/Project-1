@@ -7,6 +7,8 @@ import {
     BarChart3, GraduationCap, Plus, Trash2, Mail, Youtube, Edit2, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import { getAdminStats, getAllUsers, updateUserRole } from '@/services/adminService';
@@ -42,7 +44,12 @@ function MultiSelect({ options, value, onChange, placeholder }: { options: strin
     );
 }
 
-const EMPTY_FORM = { name: '', email: '', youtubeChannel: '', boards: [] as string[], languages: [] as string[], standards: [] as string[], bio: '' };
+const getProfilePicUrl = (path: string) => {
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
+    return `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
+const EMPTY_FORM = { name: '', email: '', youtubeChannel: '', boards: [] as string[], languages: [] as string[], standards: [] as string[], bio: '', playlists: [] as { title: string, url: string, category?: string }[], profilePicture: null as File | null };
 
 export default function AdminDashboard() {
     const { user } = useAuthStore();
@@ -61,6 +68,14 @@ export default function AdminDashboard() {
     const [savingMentor, setSavingMentor] = useState(false);
     const [mentorError, setMentorError] = useState('');
     const [editingMentor, setEditingMentor] = useState<Mentor | null>(null);
+
+    // Image Crop State
+    const [cropModalOpen, setCropModalOpen] = useState(false);
+    const [imgSrc, setImgSrc] = useState('');
+    const [crop, setCrop] = useState<Crop>();
+    const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
+    const [imageRef, setImageRef] = useState<HTMLImageElement | null>(null);
+    const [croppedPreviewUrl, setCroppedPreviewUrl] = useState<string | null>(null);
 
     useEffect(() => {
         if (user && user.role !== 'ADMIN') { router.push('/dashboard'); return; }
@@ -101,20 +116,92 @@ export default function AdminDashboard() {
         } finally { setUpdatingUserId(null); }
     };
 
+    function onSelectFile(e: React.ChangeEvent<HTMLInputElement>) {
+        if (e.target.files && e.target.files.length > 0) {
+            setCrop(undefined); // Reset crop state
+            const reader = new FileReader();
+            reader.addEventListener('load', () => {
+                setImgSrc(reader.result?.toString() || '');
+                setCropModalOpen(true);
+            });
+            reader.readAsDataURL(e.target.files[0]);
+            e.target.value = ''; // Reset input so same file can be selected again
+        }
+    }
+
+    function onImageLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+        const { width, height } = e.currentTarget;
+        setImageRef(e.currentTarget);
+        const crop = centerCrop(
+            makeAspectCrop({ unit: '%', width: 90 }, 1, width, height),
+            width,
+            height
+        );
+        setCrop(crop);
+    }
+
+    const generateCroppedImage = async () => {
+        if (!completedCrop || !imageRef) return;
+
+        const canvas = document.createElement('canvas');
+        const scaleX = imageRef.naturalWidth / imageRef.width;
+        const scaleY = imageRef.naturalHeight / imageRef.height;
+        canvas.width = completedCrop.width;
+        canvas.height = completedCrop.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        ctx.drawImage(
+            imageRef,
+            completedCrop.x * scaleX,
+            completedCrop.y * scaleY,
+            completedCrop.width * scaleX,
+            completedCrop.height * scaleY,
+            0,
+            0,
+            completedCrop.width,
+            completedCrop.height
+        );
+
+        canvas.toBlob((blob) => {
+            if (!blob) return;
+            const file = new File([blob], 'profile_picture.jpg', { type: 'image/jpeg' });
+            setMentorForm((prev) => ({ ...prev, profilePicture: file }));
+            setCroppedPreviewUrl(URL.createObjectURL(blob));
+            setCropModalOpen(false);
+        }, 'image/jpeg');
+    };
+
     const handleSaveMentor = async () => {
         if (!mentorForm.name || !mentorForm.email || !mentorForm.boards.length || !mentorForm.languages.length || !mentorForm.standards.length) {
             setMentorError('Name, email, board, language and standard are required.'); return;
         }
         setSavingMentor(true); setMentorError('');
         try {
+            const formData = new FormData();
+            formData.append('name', mentorForm.name);
+            formData.append('email', mentorForm.email);
+            if (mentorForm.youtubeChannel) formData.append('youtubeChannel', mentorForm.youtubeChannel);
+            if (mentorForm.bio) formData.append('bio', mentorForm.bio);
+            mentorForm.boards.forEach(b => formData.append('boards', b));
+            mentorForm.languages.forEach(l => formData.append('languages', l));
+            mentorForm.standards.forEach(s => formData.append('standards', s));
+            if (mentorForm.profilePicture) {
+                formData.append('profilePicture', mentorForm.profilePicture);
+            }
+            if (mentorForm.playlists && mentorForm.playlists.length > 0) {
+                formData.append('playlists', JSON.stringify(mentorForm.playlists));
+            }
+
             if (editingMentor) {
-                const updated = await updateMentor(editingMentor.id, mentorForm);
+                formData.append('isActive', editingMentor.isActive ? 'true' : 'false');
+                const updated = await updateMentor(editingMentor.id, formData);
                 setMentors(mentors.map(m => m.id === editingMentor.id ? updated : m));
             } else {
-                const newMentor = await createMentor(mentorForm as any);
+                const newMentor = await createMentor(formData as unknown as any); // Type assertion for compatibility
                 setMentors([newMentor, ...mentors]);
             }
-            setShowAddMentor(false); setMentorForm(EMPTY_FORM); setEditingMentor(null);
+            setShowAddMentor(false); setMentorForm(EMPTY_FORM); setEditingMentor(null); setCroppedPreviewUrl(null);
         } catch (e: any) {
             setMentorError(e.message || 'Failed to save mentor.');
         } finally { setSavingMentor(false); }
@@ -242,7 +329,7 @@ export default function AdminDashboard() {
                                     <div className="w-12 h-12 bg-cyan-500/10 rounded-2xl flex items-center justify-center"><GraduationCap className="text-cyan-400" /></div>
                                     <div><h2 className="text-2xl font-bold">Mentor Management</h2><p className="text-sm text-gray-500">Add and manage mentor profiles for students.</p></div>
                                 </div>
-                                <button onClick={() => { setMentorForm(EMPTY_FORM); setEditingMentor(null); setShowAddMentor(true); setMentorError(''); }}
+                                <button onClick={() => { setMentorForm(EMPTY_FORM); setEditingMentor(null); setShowAddMentor(true); setMentorError(''); setCroppedPreviewUrl(null); }}
                                     className="flex items-center gap-2 px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-black font-black rounded-xl transition-all">
                                     <Plus size={16} />Add Mentor
                                 </button>
@@ -262,7 +349,11 @@ export default function AdminDashboard() {
                                                 <tr key={m.id} className="hover:bg-white/5 transition-colors">
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-700 flex items-center justify-center text-white font-black text-sm">{m.name[0]}</div>
+                                                            {m.profilePicture ? (
+                                                                <img src={getProfilePicUrl(m.profilePicture)} alt={m.name} className="w-9 h-9 rounded-xl object-cover" />
+                                                            ) : (
+                                                                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-700 flex items-center justify-center text-white font-black text-sm">{m.name[0]}</div>
+                                                            )}
                                                             <div><div className="font-bold text-white text-sm">{m.name}</div><div className="text-xs text-gray-500">{m.email}</div></div>
                                                         </div>
                                                     </td>
@@ -272,7 +363,7 @@ export default function AdminDashboard() {
                                                     <td className="px-6 py-4">{m.avgRating ? <span className="text-yellow-400 font-bold">⭐ {m.avgRating}</span> : <span className="text-gray-600 text-xs">No ratings</span>}</td>
                                                     <td className="px-6 py-4 text-right">
                                                         <div className="flex gap-2 justify-end">
-                                                            <button onClick={() => { setEditingMentor(m); setMentorForm({ name: m.name, email: m.email, youtubeChannel: m.youtubeChannel || '', boards: m.boards, languages: m.languages, standards: m.standards, bio: m.bio || '' }); setShowAddMentor(true); setMentorError(''); }}
+                                                            <button onClick={() => { setEditingMentor(m); setMentorForm({ name: m.name, email: m.email, youtubeChannel: m.youtubeChannel || '', boards: m.boards, languages: m.languages, standards: m.standards, playlists: m.playlists || [], bio: m.bio || '', profilePicture: null }); setCroppedPreviewUrl(null); setShowAddMentor(true); setMentorError(''); }}
                                                                 className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500 hover:text-white transition-all flex items-center gap-1">
                                                                 <Edit2 size={12} />Edit
                                                             </button>
@@ -311,17 +402,99 @@ export default function AdminDashboard() {
                             <div className="p-6 space-y-4">
                                 <Field label="Full Name *"><input value={mentorForm.name} onChange={e => setMentorForm({ ...mentorForm, name: e.target.value })} placeholder="Dr. Ramesh Sharma" className="w-full bg-[#0B1120] border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-cyan-500/50 focus:outline-none" /></Field>
                                 <Field label="Email Address *"><input type="email" value={mentorForm.email} onChange={e => setMentorForm({ ...mentorForm, email: e.target.value })} placeholder="mentor@email.com" className="w-full bg-[#0B1120] border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-cyan-500/50 focus:outline-none" /></Field>
+                                <Field label="Profile Picture (optional)">
+                                    <div className="flex items-center gap-4">
+                                        {(croppedPreviewUrl || (editingMentor && editingMentor.profilePicture)) && (
+                                            <img
+                                                src={croppedPreviewUrl || getProfilePicUrl(editingMentor!.profilePicture!)}
+                                                alt="Preview"
+                                                className="w-16 h-16 rounded-full object-cover border-2 border-cyan-500/50"
+                                            />
+                                        )}
+                                        <input type="file" accept="image/jpeg, image/png, image/gif" onChange={onSelectFile} className="w-full bg-[#0B1120] border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-cyan-500/50 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-500/10 file:text-cyan-400 hover:file:bg-cyan-500/20" />
+                                    </div>
+                                </Field>
                                 <Field label="YouTube Channel (optional)"><input value={mentorForm.youtubeChannel} onChange={e => setMentorForm({ ...mentorForm, youtubeChannel: e.target.value })} placeholder="@channelname" className="w-full bg-[#0B1120] border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-cyan-500/50 focus:outline-none" /></Field>
                                 <Field label="Board of Teaching *"><MultiSelect options={BOARDS_OPT} value={mentorForm.boards} onChange={v => setMentorForm({ ...mentorForm, boards: v })} placeholder="Select boards..." /></Field>
                                 <Field label="Can Speak In *"><MultiSelect options={LANG_OPT} value={mentorForm.languages} onChange={v => setMentorForm({ ...mentorForm, languages: v })} placeholder="Select languages..." /></Field>
                                 <Field label="Can Teach Standards *"><MultiSelect options={STD_OPT} value={mentorForm.standards} onChange={v => setMentorForm({ ...mentorForm, standards: v })} placeholder="Select standards..." /></Field>
                                 <Field label="Short Bio (optional)"><textarea value={mentorForm.bio} onChange={e => setMentorForm({ ...mentorForm, bio: e.target.value })} placeholder="Brief background..." rows={3} className="w-full bg-[#0B1120] border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-cyan-500/50 focus:outline-none resize-none" /></Field>
+                                <Field label="YouTube Playlists (optional)">
+                                    <div className="space-y-3 mt-2">
+                                        {mentorForm.playlists.map((playlist, idx) => (
+                                            <div key={idx} className="flex flex-col gap-2 p-3 bg-[#0B1120] border border-gray-700 rounded-xl relative group">
+                                                <input value={playlist.title} onChange={e => {
+                                                    const newPlaylists = [...mentorForm.playlists];
+                                                    newPlaylists[idx].title = e.target.value;
+                                                    setMentorForm({ ...mentorForm, playlists: newPlaylists });
+                                                }} placeholder="Playlist Title (e.g., Algebra Crash Course)" className="bg-transparent text-sm font-bold focus:outline-none w-full border-b border-gray-700 focus:border-cyan-500 pb-1" />
+                                                <input value={playlist.url} onChange={e => {
+                                                    const newPlaylists = [...mentorForm.playlists];
+                                                    newPlaylists[idx].url = e.target.value;
+                                                    setMentorForm({ ...mentorForm, playlists: newPlaylists });
+                                                }} placeholder="URL (https://youtube.com/...)" className="bg-transparent text-xs text-gray-400 focus:outline-none w-full border-b border-gray-700 focus:border-cyan-500 pb-1" />
+                                                <input value={playlist.category || ''} onChange={e => {
+                                                    const newPlaylists = [...mentorForm.playlists];
+                                                    newPlaylists[idx].category = e.target.value;
+                                                    setMentorForm({ ...mentorForm, playlists: newPlaylists });
+                                                }} placeholder="Category (e.g., Math, Physics) (Optional)" className="bg-transparent text-xs text-cyan-400 focus:outline-none w-full pb-1" />
+                                                <button onClick={() => {
+                                                    setMentorForm({ ...mentorForm, playlists: mentorForm.playlists.filter((_, i) => i !== idx) });
+                                                }} className="absolute top-2 right-2 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><X size={14} /></button>
+                                            </div>
+                                        ))}
+                                        <button onClick={() => setMentorForm({ ...mentorForm, playlists: [...mentorForm.playlists, { title: '', url: '', category: '' }] })}
+                                            className="w-full py-2 border border-dashed border-gray-700 rounded-xl text-xs font-bold text-gray-400 hover:text-cyan-400 hover:border-cyan-500/50 transition-colors flex items-center justify-center gap-1">
+                                            <Plus size={14} /> Add Playlist
+                                        </button>
+                                    </div>
+                                </Field>
                                 {mentorError && <p className="text-red-400 text-sm">{mentorError}</p>}
                                 <button onClick={handleSaveMentor} disabled={savingMentor}
                                     className="w-full flex items-center justify-center gap-2 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-black rounded-xl transition-all disabled:opacity-50">
                                     {savingMentor ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                                     {savingMentor ? 'Saving...' : editingMentor ? 'Update Mentor' : 'Add Mentor'}
                                 </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Crop Modal */}
+            <AnimatePresence>
+                {cropModalOpen && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4"
+                        onClick={() => setCropModalOpen(false)}>
+                        <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+                            className="bg-[#0F1729] border border-gray-800 rounded-3xl w-full max-w-lg overflow-hidden flex flex-col"
+                            onClick={e => e.stopPropagation()}>
+                            <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-[#151B2D]">
+                                <h3 className="text-lg font-bold">Crop Profile Picture</h3>
+                                <button onClick={() => setCropModalOpen(false)} className="text-gray-500 hover:text-white p-1 hover:bg-gray-800 rounded-lg"><X size={18} /></button>
+                            </div>
+                            <div className="p-4 flex-1 flex justify-center items-center bg-black/50 overflow-auto max-h-[60vh]">
+                                {imgSrc && (
+                                    <ReactCrop
+                                        crop={crop}
+                                        onChange={(_, percentCrop) => setCrop(percentCrop)}
+                                        onComplete={(c) => setCompletedCrop(c)}
+                                        aspect={1}
+                                        circularCrop
+                                    >
+                                        <img
+                                            src={imgSrc}
+                                            alt="Crop me"
+                                            className="max-h-[50vh] object-contain"
+                                            onLoad={onImageLoad}
+                                        />
+                                    </ReactCrop>
+                                )}
+                            </div>
+                            <div className="p-4 border-t border-gray-800 bg-[#151B2D] flex justify-end gap-2">
+                                <button onClick={() => setCropModalOpen(false)} className="px-4 py-2 rounded-xl font-bold text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-all">Cancel</button>
+                                <button onClick={generateCroppedImage} disabled={!completedCrop?.width || !completedCrop?.height} className="px-5 py-2 rounded-xl font-bold text-sm bg-cyan-500 hover:bg-cyan-400 text-black transition-all disabled:opacity-50">Crop & Save</button>
                             </div>
                         </motion.div>
                     </motion.div>

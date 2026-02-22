@@ -8,12 +8,30 @@ import {
 } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
-import { getMentors, requestMeeting, rateMentor, Mentor } from '@/services/mentorService';
+import { getMentors, rateMentor, Mentor } from '@/services/mentorService';
 import { useAuthStore } from '@/store/authStore';
 
 const BOARDS = ['All Boards', 'CBSE', 'ICSE', 'Maharashtra State Board', 'Gujarat Board', 'UP Board'];
 const STANDARDS = ['All Standards', '8', '9', '10'];
 const LANGUAGES = ['All Languages', 'English', 'Hindi', 'Marathi'];
+
+const getProfilePicUrl = (path: string) => {
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
+    return `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
+const getYouTubeEmbedUrl = (url: string) => {
+    try {
+        const urlObj = new URL(url);
+        if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
+            if (urlObj.pathname === '/watch') return `https://www.youtube.com/embed/${urlObj.searchParams.get('v')}`;
+            if (urlObj.pathname === '/playlist') return `https://www.youtube.com/embed/videoseries?list=${urlObj.searchParams.get('list')}`;
+            if (urlObj.pathname.startsWith('/embed/')) return url;
+            if (urlObj.hostname === 'youtu.be') return `https://www.youtube.com/embed${urlObj.pathname}`;
+        }
+    } catch (e) { }
+    return url;
+};
 
 function StarRating({ value, onChange, readonly = false }: { value: number; onChange?: (v: number) => void; readonly?: boolean }) {
     const [hovered, setHovered] = useState(0);
@@ -51,9 +69,13 @@ function MentorCard({ mentor, onClick }: { mentor: Mentor; onClick: () => void }
         >
             {/* Avatar */}
             <div className="flex items-start gap-4 mb-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-700 flex items-center justify-center text-white font-black text-xl flex-shrink-0">
-                    {mentor.name[0].toUpperCase()}
-                </div>
+                {mentor.profilePicture ? (
+                    <img src={getProfilePicUrl(mentor.profilePicture)} alt={mentor.name} className="w-14 h-14 rounded-2xl object-cover flex-shrink-0" />
+                ) : (
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-700 flex items-center justify-center text-white font-black text-xl flex-shrink-0">
+                        {mentor.name[0].toUpperCase()}
+                    </div>
+                )}
                 <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-white text-lg leading-tight group-hover:text-cyan-400 transition-colors truncate">{mentor.name}</h3>
                     {mentor.avgRating ? (
@@ -98,29 +120,18 @@ function MentorCard({ mentor, onClick }: { mentor: Mentor; onClick: () => void }
     );
 }
 
-function MentorModal({ mentor, onClose, currentUserId }: { mentor: Mentor; onClose: () => void; currentUserId: string }) {
-    const [message, setMessage] = useState('');
-    const [sending, setSending] = useState(false);
-    const [sent, setSent] = useState(false);
+export function MentorModal({ mentor, onClose, currentUserId }: { mentor: Mentor; onClose: () => void; currentUserId: string }) {
     const [ratingValue, setRatingValue] = useState(0);
     const [ratingComment, setRatingComment] = useState('');
     const [submittingRating, setSubmittingRating] = useState(false);
     const [ratingDone, setRatingDone] = useState(false);
-    const [activeTab, setActiveTab] = useState<'profile' | 'request' | 'rate'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'playlists' | 'rate'>('profile');
+    const [playlistFilter, setPlaylistFilter] = useState<string>('All');
+    const [playingVideoUrl, setPlayingVideoUrl] = useState<string | null>(null);
     const [error, setError] = useState('');
 
-    const handleRequest = async () => {
-        if (!message.trim()) { setError('Please write a message.'); return; }
-        setSending(true); setError('');
-        try {
-            await requestMeeting(mentor.id, message);
-            setSent(true);
-        } catch (e: any) {
-            setError(e.message || 'Failed to send request.');
-        } finally {
-            setSending(false);
-        }
-    };
+    const playlistCategories = ['All', ...Array.from(new Set(mentor.playlists?.map(p => p.category).filter(Boolean)))];
+    const filteredPlaylists = mentor.playlists?.filter(p => playlistFilter === 'All' || p.category === playlistFilter) || [];
 
     const handleRate = async () => {
         if (!ratingValue) { setError('Please select a star rating.'); return; }
@@ -149,9 +160,13 @@ function MentorModal({ mentor, onClose, currentUserId }: { mentor: Mentor; onClo
                 {/* Header */}
                 <div className="p-6 border-b border-gray-800 flex items-start justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-700 flex items-center justify-center text-white font-black text-2xl">
-                            {mentor.name[0].toUpperCase()}
-                        </div>
+                        {mentor.profilePicture ? (
+                            <img src={getProfilePicUrl(mentor.profilePicture)} alt={mentor.name} className="w-14 h-14 rounded-2xl object-cover text-xl" />
+                        ) : (
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-700 flex items-center justify-center text-white font-black text-2xl">
+                                {mentor.name[0].toUpperCase()}
+                            </div>
+                        )}
                         <div>
                             <h2 className="text-xl font-black text-white">{mentor.name}</h2>
                             {mentor.avgRating ? (
@@ -170,13 +185,13 @@ function MentorModal({ mentor, onClose, currentUserId }: { mentor: Mentor; onClo
 
                 {/* Tabs */}
                 <div className="flex border-b border-gray-800">
-                    {(['profile', 'request', 'rate'] as const).map(tab => (
+                    {(['profile', ...(mentor.playlists?.length ? ['playlists'] : []), 'rate'] as const).map(tab => (
                         <button
                             key={tab}
-                            onClick={() => { setActiveTab(tab); setError(''); }}
+                            onClick={() => { setActiveTab(tab as any); setError(''); }}
                             className={`flex-1 py-3 text-sm font-bold capitalize transition-all ${activeTab === tab ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-500 hover:text-white'}`}
                         >
-                            {tab === 'request' ? 'Request Meeting' : tab === 'rate' ? 'Rate Mentor' : 'Profile'}
+                            {tab === 'rate' ? 'Rate Mentor' : tab}
                         </button>
                     ))}
                 </div>
@@ -209,7 +224,7 @@ function MentorModal({ mentor, onClose, currentUserId }: { mentor: Mentor; onClo
                             {mentor.ratings.length > 0 && (
                                 <div>
                                     <h4 className="text-white font-bold mb-3 text-sm">Student Reviews</h4>
-                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                    <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                                         {mentor.ratings.map((r: any, i) => (
                                             <div key={i} className="bg-[#151B2D] rounded-xl p-3">
                                                 <div className="flex items-center gap-2 mb-1">
@@ -223,41 +238,34 @@ function MentorModal({ mentor, onClose, currentUserId }: { mentor: Mentor; onClo
                             )}
                         </div>
                     )}
-
-                    {/* Request Meeting Tab */}
-                    {activeTab === 'request' && (
+                    {/* Playlists Tab */}
+                    {activeTab === 'playlists' && (
                         <div className="space-y-4">
-                            {sent ? (
-                                <div className="text-center py-8">
-                                    <CheckCircle className="mx-auto text-emerald-400 mb-3" size={48} />
-                                    <h3 className="text-white font-bold text-lg mb-1">Request Sent!</h3>
-                                    <p className="text-gray-400 text-sm">Your meeting request has been emailed to <strong>{mentor.name}</strong>.</p>
-                                    <p className="text-gray-500 text-xs mt-2">They will reply to your email directly.</p>
+                            {playlistCategories.length > 1 && (
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    {playlistCategories.map(cat => (
+                                        <button key={cat as string} onClick={() => setPlaylistFilter(cat as string)}
+                                            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${playlistFilter === cat ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-transparent text-gray-400 border-gray-700 hover:border-gray-500 hover:text-white'}`}>
+                                            {cat as string}
+                                        </button>
+                                    ))}
                                 </div>
-                            ) : (
-                                <>
-                                    <p className="text-gray-400 text-sm">Write a message to <strong className="text-white">{mentor.name}</strong>. An email will be sent from Yatsya with your contact details.</p>
-                                    <textarea
-                                        value={message}
-                                        onChange={e => setMessage(e.target.value)}
-                                        placeholder="Hi, I'm a Std 9 student struggling with Algebra. I'd love to schedule a 1-on-1 session..."
-                                        rows={5}
-                                        className="w-full bg-[#151B2D] border border-gray-700 rounded-xl p-4 text-white text-sm placeholder-gray-600 focus:border-cyan-500/50 focus:outline-none resize-none"
-                                    />
-                                    {error && <p className="text-red-400 text-sm">{error}</p>}
-                                    <button
-                                        onClick={handleRequest}
-                                        disabled={sending}
-                                        className="w-full flex items-center justify-center gap-2 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-black rounded-xl transition-all disabled:opacity-50"
-                                    >
-                                        {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                                        {sending ? 'Sending...' : 'Send Meeting Request'}
-                                    </button>
-                                </>
                             )}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {filteredPlaylists.map((playlist, i) => (
+                                    <button key={i} onClick={() => setPlayingVideoUrl(playlist.url)} className="flex flex-col gap-1 p-3 bg-[#151B2D] border border-gray-800 hover:border-cyan-500/50 rounded-xl transition-all group text-left">
+                                        <div className="flex justify-between items-start w-full gap-2">
+                                            <span className="text-white text-sm font-bold group-hover:text-cyan-400 transition-colors line-clamp-2 flex-1">{playlist.title}</span>
+                                            <Youtube size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+                                        </div>
+                                        {playlist.category && <span className="text-xs text-cyan-500 font-medium px-2 py-0.5 bg-cyan-500/10 rounded-md mt-1 self-start">{playlist.category}</span>}
+                                        <span className="text-xs text-gray-500 truncate mt-auto">{playlist.url}</span>
+                                    </button>
+                                ))}
+                                {filteredPlaylists.length === 0 && <p className="text-gray-500 text-sm py-4 col-span-full text-center">No playlists found for this category.</p>}
+                            </div>
                         </div>
                     )}
-
                     {/* Rate Mentor Tab */}
                     {activeTab === 'rate' && (
                         <div className="space-y-4">
@@ -299,6 +307,28 @@ function MentorModal({ mentor, onClose, currentUserId }: { mentor: Mentor; onClo
                         </div>
                     )}
                 </div>
+
+                {/* Overlay Player */}
+                {playingVideoUrl && (
+                    <div className="absolute inset-0 z-50 bg-[#0F1729] rounded-3xl flex flex-col overflow-hidden">
+                        <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-[#0B1120]">
+                            <div className="flex items-center gap-2 text-red-500 font-bold">
+                                <Youtube size={20} /> Now Playing
+                            </div>
+                            <button onClick={() => setPlayingVideoUrl(null)} className="text-gray-500 hover:text-white p-2 hover:bg-gray-800 rounded-xl transition-all">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="flex-1 bg-black w-full h-full p-0 m-0">
+                            <iframe
+                                src={`${getYouTubeEmbedUrl(playingVideoUrl)}`}
+                                className="w-full h-full border-0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                            ></iframe>
+                        </div>
+                    </div>
+                )}
             </motion.div>
         </motion.div>
     );

@@ -316,10 +316,12 @@ model Mentor {
   id             String         @id @default(uuid())
   name           String
   email          String         @unique
+  profilePicture String?
   youtubeChannel String?
   boards         String         // JSON array: ["CBSE","Maharashtra State Board"]
   languages      String         // JSON array: ["English","Hindi","Marathi"]
   standards      String         // JSON array: ["8","9","10"]
+  playlists      String?        // JSON array: [{"title": "Science 10th", "url": "https://youtube.com/..."}]
   bio            String?
   isActive       Boolean        @default(true)
   ratings        MentorRating[]

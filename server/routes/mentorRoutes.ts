@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate } from '../middlewares/authMiddleware.js';
+import { upload } from '../middlewares/upload.js';
 import {
     getAllMentors,
     getMentorById,
@@ -20,8 +21,8 @@ const adminOnly = (req: any, res: any, next: any) => {
 
 router.get('/', authenticate, getAllMentors);
 router.get('/:id', authenticate, getMentorById);
-router.post('/', authenticate, adminOnly, createMentor);
-router.put('/:id', authenticate, adminOnly, updateMentor);
+router.post('/', authenticate, adminOnly, upload.single('profilePicture'), createMentor);
+router.put('/:id', authenticate, adminOnly, upload.single('profilePicture'), updateMentor);
 router.delete('/:id', authenticate, adminOnly, deleteMentor);
 router.post('/:id/request', authenticate, requestMeeting);
 router.post('/:id/rate', authenticate, rateMentor);

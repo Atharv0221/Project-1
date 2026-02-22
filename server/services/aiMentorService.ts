@@ -7,7 +7,7 @@ dotenv.config();
 
 // Ollama Setup
 const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
-const ollamaModel = process.env.OLLAMA_MODEL || 'llama3';
+const ollamaModel = process.env.OLLAMA_MODEL || 'qwen2.5:0.5b';
 const ollama = new Ollama({ host: ollamaHost });
 
 // Ollama Speed Options — read from .env for easy tuning without code changes
@@ -17,6 +17,7 @@ const OLLAMA_FAST_OPTIONS = {
     temperature: 0.3,   // More deterministic, less randomness
     top_k: 20,          // Restrict vocab sampling
     top_p: 0.8,
+    num_thread: 8,      // Use more CPU threads for faster local inference
 };
 
 // For end-of-quiz deep report — allow more tokens but still optimized

@@ -2,19 +2,26 @@ import { useAuthStore } from '@/store/authStore';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-const authHeaders = () => ({
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${useAuthStore.getState().token}`
-});
+const authHeaders = (isFormData: boolean = false) => {
+    const headers: any = {
+        Authorization: `Bearer ${useAuthStore.getState().token}`
+    };
+    if (!isFormData) {
+        headers['Content-Type'] = 'application/json';
+    }
+    return headers;
+};
 
 export interface Mentor {
     id: string;
     name: string;
     email: string;
+    profilePicture?: string;
     youtubeChannel?: string;
     boards: string[];
     languages: string[];
     standards: string[];
+    playlists?: { title: string, url: string, category?: string }[];
     bio?: string;
     isActive: boolean;
     avgRating: number | null;
@@ -39,21 +46,22 @@ export const getMentorById = async (id: string): Promise<Mentor> => {
     return res.json();
 };
 
-export const createMentor = async (data: Omit<Mentor, 'id' | 'avgRating' | 'totalRatings' | 'ratings' | 'createdAt' | 'isActive'>): Promise<Mentor> => {
+export const createMentor = async (data: FormData): Promise<Mentor> => {
     const res = await fetch(`${API_BASE}/mentors`, {
         method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify(data)
+        headers: authHeaders(true),
+        body: data
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
     return res.json();
 };
 
-export const updateMentor = async (id: string, data: Partial<Mentor>): Promise<Mentor> => {
+export const updateMentor = async (id: string, data: FormData | Partial<Mentor>): Promise<Mentor> => {
+    const isFormData = data instanceof FormData;
     const res = await fetch(`${API_BASE}/mentors/${id}`, {
         method: 'PUT',
-        headers: authHeaders(),
-        body: JSON.stringify(data)
+        headers: authHeaders(isFormData),
+        body: isFormData ? data : JSON.stringify(data)
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
     return res.json();
