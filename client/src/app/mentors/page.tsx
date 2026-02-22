@@ -8,8 +8,9 @@ import {
 } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
-import { getMentors, rateMentor, Mentor } from '@/services/mentorService';
+import { getMentors, rateMentor, getMentorAvailability, requestMeeting, Mentor, Availability } from '@/services/mentorService';
 import { useAuthStore } from '@/store/authStore';
+import { CreditCard, Calendar, Clock } from 'lucide-react';
 
 const BOARDS = ['All Boards', 'CBSE', 'ICSE', 'Maharashtra State Board', 'Gujarat Board', 'UP Board'];
 const STANDARDS = ['All Standards', '8', '9', '10'];
@@ -125,10 +126,62 @@ export function MentorModal({ mentor, onClose, currentUserId }: { mentor: Mentor
     const [ratingComment, setRatingComment] = useState('');
     const [submittingRating, setSubmittingRating] = useState(false);
     const [ratingDone, setRatingDone] = useState(false);
-    const [activeTab, setActiveTab] = useState<'profile' | 'playlists' | 'rate'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'playlists' | 'rate' | 'book'>('profile');
     const [playlistFilter, setPlaylistFilter] = useState<string>('All');
     const [playingVideoUrl, setPlayingVideoUrl] = useState<string | null>(null);
     const [error, setError] = useState('');
+
+    // Booking state
+    const [bookingMessage, setBookingMessage] = useState('');
+    const [selectedSlotId, setSelectedSlotId] = useState<string>('');
+    const [availability, setAvailability] = useState<Availability[]>([]);
+    const [loadingAvailability, setLoadingAvailability] = useState(false);
+    const [submittingBooking, setSubmittingBooking] = useState(false);
+    const [bookedSession, setBookedSession] = useState<any>(null);
+    const { user, login } = useAuthStore();
+
+    useEffect(() => {
+        if (activeTab === 'book') {
+            loadAvailability();
+        }
+    }, [activeTab]);
+
+    const loadAvailability = async () => {
+        setLoadingAvailability(true);
+        try {
+            const data = await getMentorAvailability(mentor.id);
+            setAvailability(data);
+        } catch (e: any) {
+            setError('Failed to load availability slots.');
+        } finally {
+            setLoadingAvailability(false);
+        }
+    };
+
+    const handleBuyPlan = async () => {
+        if (!user) return;
+        setSubmittingBooking(true);
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/admin/users/subscription`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${useAuthStore.getState().token}`
+                },
+                body: JSON.stringify({ userId: user.id, hours: 6 })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                // Update local store
+                login({ ...user, mentoringHoursRemaining: data.hoursRemaining }, useAuthStore.getState().token!);
+                alert('Success! 6 hours added to your account.');
+            } else throw new Error(data.message);
+        } catch (e: any) {
+            setError(e.message);
+        } finally {
+            setSubmittingBooking(false);
+        }
+    };
 
     const playlistCategories = ['All', ...Array.from(new Set(mentor.playlists?.map(p => p.category).filter(Boolean)))];
     const filteredPlaylists = mentor.playlists?.filter(p => playlistFilter === 'All' || p.category === playlistFilter) || [];
@@ -143,6 +196,26 @@ export function MentorModal({ mentor, onClose, currentUserId }: { mentor: Mentor
             setError(e.message || 'Failed to submit rating.');
         } finally {
             setSubmittingRating(false);
+        }
+    };
+
+    const handleBook = async () => {
+        if (!selectedSlotId) { setError('Please select an available time slot.'); return; }
+        if (!bookingMessage.trim()) { setError('Please provide a message for the mentor.'); return; }
+
+        setSubmittingBooking(true); setError('');
+
+        try {
+            const data = await requestMeeting(mentor.id, bookingMessage, selectedSlotId);
+            setBookedSession(data.session);
+            // Update credits in store
+            if (user) {
+                login({ ...user, mentoringHoursRemaining: data.hoursRemaining }, useAuthStore.getState().token!);
+            }
+        } catch (e: any) {
+            setError(e.message || 'Failed to request meeting.');
+        } finally {
+            setSubmittingBooking(false);
         }
     };
 
@@ -185,13 +258,13 @@ export function MentorModal({ mentor, onClose, currentUserId }: { mentor: Mentor
 
                 {/* Tabs */}
                 <div className="flex border-b border-gray-800">
-                    {(['profile', ...(mentor.playlists?.length ? ['playlists'] : []), 'rate'] as const).map(tab => (
+                    {(['profile', ...(mentor.playlists?.length ? ['playlists'] : []), 'book', 'rate'] as const).map(tab => (
                         <button
                             key={tab}
                             onClick={() => { setActiveTab(tab as any); setError(''); }}
                             className={`flex-1 py-3 text-sm font-bold capitalize transition-all ${activeTab === tab ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-500 hover:text-white'}`}
                         >
-                            {tab === 'rate' ? 'Rate Mentor' : tab}
+                            {tab === 'rate' ? 'Rate Mentor' : tab === 'book' ? 'Book Session' : tab}
                         </button>
                     ))}
                 </div>
@@ -266,6 +339,122 @@ export function MentorModal({ mentor, onClose, currentUserId }: { mentor: Mentor
                             </div>
                         </div>
                     )}
+                    {/* Book Session Tab */}
+                    {activeTab === 'book' && (
+                        <div className="space-y-4">
+                            {bookedSession ? (
+                                <div className="text-center py-6 bg-[#151B2D] rounded-2xl border border-cyan-500/20 shadow-[0_0_20px_rgba(6,182,212,0.1)]">
+                                    <CheckCircle className="mx-auto text-cyan-400 mb-3 animate-bounce" size={48} />
+                                    <h3 className="text-white font-bold text-lg mb-1">Session Scheduled!</h3>
+                                    <p className="text-gray-400 text-sm mb-4 border-b border-gray-800 pb-4">An email has been sent to <strong>{mentor.name}</strong> to notify them about your upcoming meeting.</p>
+
+                                    <div className="mx-auto p-4 bg-[#0B1120] rounded-xl flex items-center justify-between w-full border border-gray-800 text-left">
+                                        <div className="flex-1 overflow-hidden pr-3">
+                                            <p className="text-xs text-gray-500 mb-1">Video Meeting Link (Pointer):</p>
+                                            <a href={bookedSession.meetingLink} target="_blank" rel="noreferrer" className="text-cyan-400 text-sm font-mono truncate block hover:underline">
+                                                {bookedSession.meetingLink}
+                                            </a>
+                                        </div>
+                                        <button
+                                            onClick={() => { navigator.clipboard.writeText(bookedSession.meetingLink); }}
+                                            className="bg-cyan-500/10 text-cyan-400 p-2 rounded-lg hover:bg-cyan-500 hover:text-white transition-all flex-shrink-0"
+                                            title="Copy Link"
+                                        >
+                                            Copy
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-yellow-500/80 mt-4 px-4">Please keep this link safe. You'll need it to join your session at {new Date(bookedSession.scheduledAt).toLocaleString()}.</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="bg-[#151B2D] rounded-2xl p-4 flex justify-between items-center border border-gray-800">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-cyan-500/10 flex items-center justify-center text-cyan-400">
+                                                <Clock size={20} />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-gray-500">Remaining Hours</p>
+                                                <p className="text-lg font-black text-white">{user?.mentoringHoursRemaining || 0} hrs</p>
+                                            </div>
+                                        </div>
+                                        {(user?.mentoringHoursRemaining || 0) < 1 && (
+                                            <button
+                                                onClick={handleBuyPlan}
+                                                className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-600 text-black font-black text-xs rounded-lg hover:shadow-[0_0_15px_rgba(234,179,8,0.3)] transition-all"
+                                            >
+                                                Upgrade (₹2000)
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {(user?.mentoringHoursRemaining || 0) < 1 ? (
+                                        <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-center space-y-3">
+                                            <CreditCard className="mx-auto text-red-400" size={32} />
+                                            <p className="text-red-400 text-sm font-medium">You need at least 1 hour in your account to book a session.</p>
+                                            <button
+                                                onClick={handleBuyPlan}
+                                                className="w-full py-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold rounded-xl transition-all"
+                                            >
+                                                Buy 6 Hour Monthly Plan - ₹2000
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-2">
+                                                    <Calendar size={14} /> Available Time Slots
+                                                </label>
+                                                {loadingAvailability ? (
+                                                    <div className="flex items-center gap-2 text-gray-500 text-sm py-4">
+                                                        <Loader2 size={16} className="animate-spin" /> Fetching slots...
+                                                    </div>
+                                                ) : availability.length > 0 ? (
+                                                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                                                        {availability.map(slot => (
+                                                            <button
+                                                                key={slot.id}
+                                                                onClick={() => setSelectedSlotId(slot.id)}
+                                                                className={`p-3 rounded-xl border text-sm text-center transition-all ${selectedSlotId === slot.id ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' : 'bg-[#151B2D] border-gray-700 text-gray-400 hover:border-gray-500'}`}
+                                                            >
+                                                                <p className="font-bold">{new Date(slot.startTime).toLocaleDateString()}</p>
+                                                                <p className="text-xs opacity-70">{new Date(slot.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-yellow-500/70 text-sm py-4 bg-yellow-500/5 border border-yellow-500/10 rounded-xl px-4">
+                                                        No available slots found for this mentor. Please check back later.
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-400 mb-1 block">Message to Mentor</label>
+                                                <textarea
+                                                    value={bookingMessage}
+                                                    onChange={e => setBookingMessage(e.target.value)}
+                                                    placeholder="e.g., I need help with Algebra chapter 3..."
+                                                    rows={2}
+                                                    className="w-full bg-[#151B2D] border border-gray-700 rounded-xl p-3 text-white text-sm placeholder-gray-600 focus:border-cyan-500/50 focus:outline-none resize-none"
+                                                />
+                                            </div>
+
+                                            {error && <p className="text-red-400 text-sm font-medium bg-red-400/10 p-3 rounded-xl">{error}</p>}
+                                            <button
+                                                onClick={handleBook}
+                                                disabled={submittingBooking || !selectedSlotId || !bookingMessage.trim()}
+                                                className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] text-white font-black rounded-xl transition-all disabled:opacity-50"
+                                            >
+                                                {submittingBooking ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                                                {submittingBooking ? 'Booking...' : 'Confirm & Deduct 1 Hour'}
+                                            </button>
+                                        </>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
+
                     {/* Rate Mentor Tab */}
                     {activeTab === 'rate' && (
                         <div className="space-y-4">
@@ -330,7 +519,7 @@ export function MentorModal({ mentor, onClose, currentUserId }: { mentor: Mentor
                     </div>
                 )}
             </motion.div>
-        </motion.div>
+        </motion.div >
     );
 }
 
@@ -405,7 +594,7 @@ export default function MentorsPage() {
                         <h1 className="text-4xl md:text-5xl font-black mb-2 tracking-tight">
                             Expert <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Mentors</span>
                         </h1>
-                        <p className="text-gray-400">Connect with experienced teachers for 1-on-1 guidance.</p>
+                        <p className="text-gray-400">Connect with experienced teachers to explore curated video playlists.</p>
                     </div>
 
                     {/* Filters */}

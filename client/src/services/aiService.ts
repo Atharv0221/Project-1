@@ -38,3 +38,18 @@ export const fetchRemediation = async (questionId: string, type: 'UPGRADE' | 'DO
     const response = await api.post('remediation', { questionId, type });
     return response.data;
 };
+
+export const getChatHistory = async () => {
+    const response = await api.get('conversations');
+    return response.data;
+};
+
+export const getConversationMessages = async (id: string) => {
+    const response = await api.get(`conversations/${id}`);
+    return response.data;
+};
+
+export const clearChatHistory = async () => {
+    const response = await api.delete('conversations');
+    return response.data;
+};

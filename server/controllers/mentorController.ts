@@ -159,17 +159,60 @@ export const deleteMentor = async (req: Request, res: Response) => {
 export const requestMeeting = async (req: Request, res: Response) => {
     try {
         const userId = (req as any).user.userId;
-        const { message } = req.body;
+        const { message, availabilityId } = req.body;
 
         if (!message?.trim()) return res.status(400).json({ message: 'Message is required' });
+        if (!availabilityId) return res.status(400).json({ message: 'A specific availability slot must be selected' });
 
-        const [mentor, student] = await Promise.all([
+        const [mentor, student, slot] = await Promise.all([
             prisma.mentor.findUnique({ where: { id: req.params.id as string } }),
-            prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } })
+            prisma.user.findUnique({ where: { id: userId }, select: { id: true, name: true, email: true, mentoringHoursRemaining: true } }),
+            prisma.mentorAvailability.findUnique({ where: { id: availabilityId } })
         ]);
 
         if (!mentor) return res.status(404).json({ message: 'Mentor not found' });
         if (!student) return res.status(404).json({ message: 'Student not found' });
+        if (!slot) return res.status(404).json({ message: 'Availability slot not found' });
+        if (slot.isBooked) return res.status(400).json({ message: 'This slot has already been booked' });
+
+        // Enforce Subscription Logic
+        if (student.mentoringHoursRemaining < 1) {
+            return res.status(403).json({
+                message: 'You have NO mentoring hours remaining. Please purchase a plan (₹2000 for 6 hours) to book a session.'
+            });
+        }
+
+        const sessionDate = slot.startTime;
+
+        // Generate a simple, free Jitsi Meet link
+        const meetingPointerId = Math.random().toString(36).substring(2, 12);
+        const meetingLink = `https://meet.jit.si/YatsyaSession-${meetingPointerId}`;
+
+        const session = await prisma.$transaction([
+            // 1. Create the session
+            prisma.mentorshipSession.create({
+                data: {
+                    mentorId: mentor.id,
+                    studentId: student.id,
+                    scheduledAt: sessionDate,
+                    meetingLink,
+                    status: 'SCHEDULED',
+                    availabilityId: slot.id
+                }
+            }),
+            // 2. Mark slot as booked
+            prisma.mentorAvailability.update({
+                where: { id: slot.id },
+                data: { isBooked: true }
+            }),
+            // 3. Subtract 1 hour from student
+            prisma.user.update({
+                where: { id: student.id },
+                data: { mentoringHoursRemaining: { decrement: 1 } }
+            })
+        ]);
+
+        const sessionResult = session[0];
 
         await transporter.sendMail({
             from: `"Yatsya Platform" <${process.env.EMAIL_USER}>`,
@@ -183,6 +226,8 @@ export const requestMeeting = async (req: Request, res: Response) => {
                     <hr style="border:1px solid #1e293b;margin:24px 0;">
                     <p><strong>Student Name:</strong> ${student.name}</p>
                     <p><strong>Student Email:</strong> <a href="mailto:${student.email}" style="color:#22d3ee;">${student.email}</a></p>
+                    <p><strong>Requested Date:</strong> ${sessionDate.toLocaleString()}</p>
+                    <p><strong>Video Meeting Pointer:</strong> <a href="${meetingLink}" style="color:#22d3ee;">${meetingLink}</a></p>
                     <p><strong>Message:</strong></p>
                     <blockquote style="background:#1e293b;border-left:4px solid #22d3ee;padding:16px;border-radius:8px;margin:8px 0;">
                         ${message.replace(/\n/g, '<br>')}
@@ -193,10 +238,30 @@ export const requestMeeting = async (req: Request, res: Response) => {
             `
         });
 
-        res.json({ message: 'Meeting request sent successfully to the mentor.' });
+        res.json({
+            message: 'Meeting request confirmed. 1 hour has been deducted from your plan.',
+            session: sessionResult,
+            hoursRemaining: (student as any).mentoringHoursRemaining - 1
+        });
     } catch (error: any) {
         console.error('Meeting request error:', error);
-        res.status(500).json({ message: 'Failed to send meeting request', error: error.message });
+        res.status(500).json({ message: 'Failed to confirm meeting request', error: error.message });
+    }
+};
+
+export const getMentorAvailability = async (req: Request, res: Response) => {
+    try {
+        const slots = await prisma.mentorAvailability.findMany({
+            where: {
+                mentorId: req.params.id,
+                isBooked: false,
+                startTime: { gte: new Date() }
+            },
+            orderBy: { startTime: 'asc' }
+        });
+        res.json(slots);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching availability', error });
     }
 };
 

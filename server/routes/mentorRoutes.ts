@@ -8,7 +8,8 @@ import {
     updateMentor,
     deleteMentor,
     requestMeeting,
-    rateMentor
+    rateMentor,
+    getMentorAvailability
 } from '../controllers/mentorController.js';
 
 const router = express.Router();
@@ -21,6 +22,7 @@ const adminOnly = (req: any, res: any, next: any) => {
 
 router.get('/', authenticate, getAllMentors);
 router.get('/:id', authenticate, getMentorById);
+router.get('/:id/availability', authenticate, getMentorAvailability);
 router.post('/', authenticate, adminOnly, upload.single('profilePicture'), createMentor);
 router.put('/:id', authenticate, adminOnly, upload.single('profilePicture'), updateMentor);
 router.delete('/:id', authenticate, adminOnly, deleteMentor);

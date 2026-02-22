@@ -16,6 +16,7 @@ import ScholarStatus from '../../components/dashboard/ScholarStatus';
 import TimeSpentGraph from '../../components/dashboard/TimeSpentGraph';
 import DifficultyCompletionGraph from '../../components/dashboard/DifficultyCompletionGraph';
 import DailyStreak from '../../components/dashboard/DailyStreak';
+import MentoringCredits from '../../components/dashboard/MentoringCredits';
 
 export default function DashboardPage() {
     const { user, isAuthenticated } = useAuthStore();
@@ -43,8 +44,12 @@ export default function DashboardPage() {
                 if (data) {
                     useAuthStore.getState().login(data, token);
                 }
-            } catch (error) {
-                console.error('Failed to sync profile on dashboard:', error);
+            } catch (error: any) {
+                if (error.response?.status === 401) {
+                    useAuthStore.getState().logout();
+                } else {
+                    console.error('Failed to sync profile on dashboard:', error);
+                }
             }
         };
 
@@ -59,7 +64,9 @@ export default function DashboardPage() {
                 const data = await getQuizReports();
                 setReports(data || []);
             } catch (error: any) {
-                if (error.response?.status !== 401) {
+                if (error.response?.status === 401) {
+                    useAuthStore.getState().logout();
+                } else {
                     console.error('Failed to fetch reports:', error);
                 }
             } finally {
@@ -135,6 +142,7 @@ export default function DashboardPage() {
                                 streak={user.streak || 0}
                                 levelTitle={user.scholarStatus || 'Learner'}
                             />
+                            <MentoringCredits hours={user.mentoringHoursRemaining || 0} />
                             <DailyStreak streak={user.streak} />
                         </div>
                     </div>

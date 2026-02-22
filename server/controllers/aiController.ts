@@ -61,18 +61,59 @@ export const chatWithMentor = async (req: Request, res: Response) => {
 
         const response = await generateMentorResponse(message, { ...userContext, ...enrichedContext });
 
+        // PERSISTENCE LOGIC
+        // 1. Find or create the latest conversation for this user
+        let conversation = await prisma.conversation.findFirst({
+            where: { userId },
+            orderBy: { updatedAt: 'desc' }
+        });
+
+        if (!conversation) {
+            conversation = await prisma.conversation.create({
+                data: {
+                    userId,
+                    title: message.substring(0, 30) + (message.length > 30 ? '...' : '')
+                }
+            });
+        }
+
+        // 2. Save User Message
+        await prisma.message.create({
+            data: {
+                conversationId: conversation.id,
+                role: 'user',
+                content: message
+            }
+        });
+
+        // 3. Save Assistant Message
+        await prisma.message.create({
+            data: {
+                conversationId: conversation.id,
+                role: 'assistant',
+                content: response
+            }
+        });
+
+        // Update conversation timestamp
+        await prisma.conversation.update({
+            where: { id: conversation.id },
+            data: { updatedAt: new Date() }
+        });
+
         // Log the usage
         await prisma.analyticsLog.create({
             data: {
                 userId,
                 action: 'CHAT_WITH_MENTOR',
-                metadata: JSON.stringify({ messageLength: message.length })
+                metadata: JSON.stringify({ messageLength: message.length, conversationId: conversation.id })
             }
         });
 
         res.json({
             success: true,
             response,
+            conversationId: conversation.id,
             timestamp: new Date().toISOString()
         });
     } catch (error: any) {
@@ -188,5 +229,70 @@ export const getRemediation = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error('Remediation error:', error);
         res.status(500).json({ success: false, message: 'Failed to generate remediation' });
+    }
+};
+
+export const getChatHistory = async (req: Request, res: Response) => {
+    try {
+        const userId = (req as any).user?.userId;
+        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+        const conversations = await prisma.conversation.findMany({
+            where: { userId },
+            orderBy: { updatedAt: 'desc' },
+            include: {
+                _count: {
+                    select: { messages: true }
+                }
+            }
+        });
+
+        res.json({ success: true, conversations });
+    } catch (error: any) {
+        console.error('Get chat history error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch chat history' });
+    }
+};
+
+export const getConversationMessages = async (req: Request, res: Response) => {
+    try {
+        const userId = (req as any).user?.userId;
+        const { id } = req.params;
+
+        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+        const conversation = await prisma.conversation.findUnique({
+            where: { id, userId },
+            include: {
+                messages: {
+                    orderBy: { createdAt: 'asc' }
+                }
+            }
+        });
+
+        if (!conversation) {
+            return res.status(404).json({ message: 'Conversation not found' });
+        }
+
+        res.json({ success: true, messages: conversation.messages });
+    } catch (error: any) {
+        console.error('Get conversation messages error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch messages' });
+    }
+};
+
+export const clearChatHistory = async (req: Request, res: Response) => {
+    try {
+        const userId = (req as any).user?.userId;
+        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+        await prisma.conversation.deleteMany({
+            where: { userId }
+        });
+
+        res.json({ success: true, message: 'Chat history cleared' });
+    } catch (error: any) {
+        console.error('Clear chat error:', error);
+        res.status(500).json({ success: false, message: 'Failed to clear chat history' });
     }
 };

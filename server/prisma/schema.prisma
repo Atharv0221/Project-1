@@ -51,6 +51,11 @@ model User {
   flaggedAttempts FlaggedAttempt[]
   timeTracking    TimeTracking[]
   notifications   Notification[]
+  sessionsAsStudent MentorshipSession[] @relation("StudentSessions")
+  conversations     Conversation[]
+  
+  // Mentorship Subscription
+  mentoringHoursRemaining Float @default(0.0)
 }
 
 model Subject {
@@ -325,6 +330,8 @@ model Mentor {
   bio            String?
   isActive       Boolean        @default(true)
   ratings        MentorRating[]
+  sessions       MentorshipSession[] @relation("MentorSessions")
+  availability   MentorAvailability[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -339,5 +346,63 @@ model MentorRating {
   createdAt DateTime @default(now())
 
   @@unique([mentorId, userId])
+  @@index([mentorId])
+}
+
+model MentorshipSession {
+  id           String   @id @default(uuid())
+  mentorId     String
+  studentId    String
+  mentor       Mentor   @relation("MentorSessions", fields: [mentorId], references: [id])
+  student      User     @relation("StudentSessions", fields: [studentId], references: [id])
+  scheduledAt  DateTime
+  durationMins Int      @default(60)
+  status       String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELED
+  meetingLink  String?  // URL
+  
+  availabilityId String?  @unique
+  availability   MentorAvailability? @relation(fields: [availabilityId], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([mentorId])
+  @@index([studentId])
+}
+
+model Conversation {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  title     String?   @default("New Chat")
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String       // "user" or "assistant"
+  content        String       @db.Text
+  createdAt      DateTime     @default(now())
+  @@index([conversationId])
+}
+
+model MentorAvailability {
+  id        String   @id @default(uuid())
+  mentorId  String
+  mentor    Mentor   @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  startTime DateTime
+  endTime   DateTime
+  isBooked  Boolean  @default(false)
+  
+  session   MentorshipSession?
+
+  createdAt DateTime @default(now())
+
   @@index([mentorId])
 }

@@ -4,15 +4,19 @@ import { useState, useEffect } from 'react';
 import {
     ShieldCheck, Users, MessageSquare, HelpCircle, CheckCircle2,
     Search, RefreshCcw, UserPlus, UserMinus, ChevronRight, Loader2,
-    BarChart3, GraduationCap, Plus, Trash2, Mail, Youtube, Edit2, X
+    BarChart3, GraduationCap, Plus, Trash2, Mail, Youtube, Edit2, X,
+    Clock, Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
-import { getAdminStats, getAllUsers, updateUserRole } from '@/services/adminService';
-import { getMentors, createMentor, deleteMentor, updateMentor, Mentor } from '@/services/mentorService';
+import {
+    getAdminStats, getAllUsers, updateUserRole,
+    addMentorAvailability, deleteMentorAvailability, addSubscriptionHours
+} from '@/services/adminService';
+import { getMentors, createMentor, deleteMentor, updateMentor, getMentorAvailability, Mentor, Availability } from '@/services/mentorService';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 
@@ -68,6 +72,20 @@ export default function AdminDashboard() {
     const [savingMentor, setSavingMentor] = useState(false);
     const [mentorError, setMentorError] = useState('');
     const [editingMentor, setEditingMentor] = useState<Mentor | null>(null);
+
+    // Availability Management State
+    const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
+    const [selectedMentor, setSelectedMentor] = useState<Mentor | null>(null);
+    const [mentorSlots, setMentorSlots] = useState<Availability[]>([]);
+    const [loadingSlots, setLoadingSlots] = useState(false);
+    const [newSlot, setNewSlot] = useState({ date: '', startTime: '', endTime: '' });
+
+    // Credits Management State
+    const [showCreditsModal, setShowCreditsModal] = useState(false);
+    const [selectedUser, setSelectedUser] = useState<any>(null);
+    const [creditAmount, setCreditAmount] = useState(6);
+    const [savingCredits, setSavingCredits] = useState(false);
+
 
     // Image Crop State
     const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -213,6 +231,64 @@ export default function AdminDashboard() {
         catch (e) { alert('Failed to delete.'); }
     };
 
+    const handleManageAvailability = async (mentor: Mentor) => {
+        setSelectedMentor(mentor);
+        setShowAvailabilityModal(true);
+        setLoadingSlots(true);
+        try {
+            const slots = await getMentorAvailability(mentor.id);
+            setMentorSlots(slots);
+        } catch (e) {
+            console.error('Failed to fetch slots:', e);
+        } finally {
+            setLoadingSlots(false);
+        }
+    };
+
+    const handleAddSlot = async () => {
+        if (!selectedMentor || !newSlot.date || !newSlot.startTime || !newSlot.endTime) return;
+
+        const start = new Date(`${newSlot.date}T${newSlot.startTime}`);
+        const end = new Date(`${newSlot.date}T${newSlot.endTime}`);
+
+        try {
+            const data = await addMentorAvailability(selectedMentor.id, start.toISOString(), end.toISOString());
+            setMentorSlots([...mentorSlots, data.availability]);
+            setNewSlot({ date: '', startTime: '', endTime: '' });
+        } catch (e) {
+            alert('Failed to add slot');
+        }
+    };
+
+    const handleDeleteSlot = async (slotId: string) => {
+        try {
+            await deleteMentorAvailability(slotId);
+            setMentorSlots(mentorSlots.filter(s => s.id !== slotId));
+        } catch (e) {
+            alert('Failed to delete slot');
+        }
+    };
+
+    const handleManageCredits = (targetUser: any) => {
+        setSelectedUser(targetUser);
+        setShowCreditsModal(true);
+        setCreditAmount(6);
+    };
+
+    const handleSaveCredits = async () => {
+        if (!selectedUser) return;
+        setSavingCredits(true);
+        try {
+            const res = await addSubscriptionHours(selectedUser.id, creditAmount);
+            setUsers(users.map(u => u.id === selectedUser.id ? { ...u, mentoringHoursRemaining: res.hoursRemaining } : u));
+            setShowCreditsModal(false);
+        } catch (e) {
+            alert('Failed to add credits');
+        } finally {
+            setSavingCredits(false);
+        }
+    };
+
     const filteredUsers = users.filter(u =>
         u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         u.email?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -303,7 +379,11 @@ export default function AdminDashboard() {
                                                         <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${u.role === 'ADMIN' ? 'bg-purple-500/20 text-purple-400' : 'bg-gray-800 text-gray-400'}`}>{u.role}</span>
                                                     </td>
                                                     <td className="px-8 py-6 text-sm text-gray-400">{new Date(u.createdAt).toLocaleDateString()}</td>
-                                                    <td className="px-8 py-6 text-right">
+                                                    <td className="px-8 py-6 text-right flex justify-end gap-2">
+                                                        <button onClick={() => handleManageCredits(u)}
+                                                            className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500 hover:text-black transition-all flex items-center gap-2">
+                                                            <Clock size={14} /> Credits
+                                                        </button>
                                                         <button onClick={() => handleToggleRole(u)} disabled={updatingUserId === u.id || u.email === user.email}
                                                             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ml-auto ${updatingUserId === u.id ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : u.role === 'ADMIN' ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white'}`}>
                                                             {updatingUserId === u.id ? <Loader2 size={14} className="animate-spin" /> : u.role === 'ADMIN' ? <UserMinus size={14} /> : <UserPlus size={14} />}
@@ -363,6 +443,10 @@ export default function AdminDashboard() {
                                                     <td className="px-6 py-4">{m.avgRating ? <span className="text-yellow-400 font-bold">⭐ {m.avgRating}</span> : <span className="text-gray-600 text-xs">No ratings</span>}</td>
                                                     <td className="px-6 py-4 text-right">
                                                         <div className="flex gap-2 justify-end">
+                                                            <button onClick={() => handleManageAvailability(m)}
+                                                                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white transition-all flex items-center gap-1">
+                                                                <Clock size={12} /> Availability
+                                                            </button>
                                                             <button onClick={() => { setEditingMentor(m); setMentorForm({ name: m.name, email: m.email, youtubeChannel: m.youtubeChannel || '', boards: m.boards, languages: m.languages, standards: m.standards, playlists: m.playlists || [], bio: m.bio || '', profilePicture: null }); setCroppedPreviewUrl(null); setShowAddMentor(true); setMentorError(''); }}
                                                                 className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500 hover:text-white transition-all flex items-center gap-1">
                                                                 <Edit2 size={12} />Edit
@@ -495,6 +579,142 @@ export default function AdminDashboard() {
                             <div className="p-4 border-t border-gray-800 bg-[#151B2D] flex justify-end gap-2">
                                 <button onClick={() => setCropModalOpen(false)} className="px-4 py-2 rounded-xl font-bold text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-all">Cancel</button>
                                 <button onClick={generateCroppedImage} disabled={!completedCrop?.width || !completedCrop?.height} className="px-5 py-2 rounded-xl font-bold text-sm bg-cyan-500 hover:bg-cyan-400 text-black transition-all disabled:opacity-50">Crop & Save</button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Availability Management Modal */}
+            <AnimatePresence>
+                {showAvailabilityModal && selectedMentor && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[110] flex items-center justify-center p-4"
+                        onClick={() => setShowAvailabilityModal(false)}>
+                        <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+                            className="bg-[#0F1729] border border-gray-800 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+                            onClick={e => e.stopPropagation()}>
+                            <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+                                <div>
+                                    <h2 className="text-xl font-black">{selectedMentor.name}'s Availability</h2>
+                                    <p className="text-xs text-gray-500">Manage time slots for this mentor.</p>
+                                </div>
+                                <button onClick={() => setShowAvailabilityModal(false)} className="text-gray-500 hover:text-white p-2 hover:bg-gray-800 rounded-xl">
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <div className="p-6 flex-1 overflow-y-auto space-y-6">
+                                {/* Add New Slot Form */}
+                                <div className="bg-[#151B2D] border border-gray-800 p-4 rounded-2xl space-y-4">
+                                    <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-widest">Add New Slot</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <Field label="Date">
+                                            <input type="date" value={newSlot.date} onChange={e => setNewSlot({ ...newSlot, date: e.target.value })} className="w-full bg-[#0B1120] border border-gray-700 rounded-xl p-2.5 text-white text-sm focus:border-cyan-500/50 focus:outline-none" />
+                                        </Field>
+                                        <Field label="Start Time">
+                                            <input type="time" value={newSlot.startTime} onChange={e => setNewSlot({ ...newSlot, startTime: e.target.value })} className="w-full bg-[#0B1120] border border-gray-700 rounded-xl p-2.5 text-white text-sm focus:border-cyan-500/50 focus:outline-none" />
+                                        </Field>
+                                        <Field label="End Time">
+                                            <input type="time" value={newSlot.endTime} onChange={e => setNewSlot({ ...newSlot, endTime: e.target.value })} className="w-full bg-[#0B1120] border border-gray-700 rounded-xl p-2.5 text-white text-sm focus:border-cyan-500/50 focus:outline-none" />
+                                        </Field>
+                                    </div>
+                                    <button onClick={handleAddSlot} className="w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 text-black font-black rounded-xl transition-all flex items-center justify-center gap-2 text-sm">
+                                        <Plus size={16} /> Add Availability Slot
+                                    </button>
+                                </div>
+
+                                {/* Existing Slots */}
+                                <div>
+                                    <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Current Slots</h3>
+                                    {loadingSlots ? (
+                                        <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-cyan-500" /></div>
+                                    ) : mentorSlots.length === 0 ? (
+                                        <p className="text-center py-8 text-gray-600 text-sm italic">No slots scheduled yet.</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {mentorSlots.map(slot => (
+                                                <div key={slot.id} className={`flex items-center justify-between p-4 rounded-2xl border ${slot.isBooked ? 'bg-red-500/5 border-red-500/20' : 'bg-[#0B1120] border-gray-800'}`}>
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`p-2 rounded-lg ${slot.isBooked ? 'bg-red-500/10 text-red-400' : 'bg-cyan-500/10 text-cyan-400'}`}>
+                                                            <Calendar size={16} />
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-sm font-bold text-white">
+                                                                {new Date(slot.startTime).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                                                            </div>
+                                                            <div className="text-xs text-gray-500">
+                                                                {new Date(slot.startTime).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} -
+                                                                {new Date(slot.endTime).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        {slot.isBooked ? (
+                                                            <span className="text-[10px] font-black uppercase text-red-500 bg-red-500/10 px-2 py-1 rounded-md border border-red-500/20">Booked</span>
+                                                        ) : (
+                                                            <span className="text-[10px] font-black uppercase text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-md border border-emerald-500/20">Available</span>
+                                                        )}
+                                                        <button onClick={() => handleDeleteSlot(slot.id)} className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all">
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Credits Management Modal */}
+            <AnimatePresence>
+                {showCreditsModal && selectedUser && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[110] flex items-center justify-center p-4"
+                        onClick={() => setShowCreditsModal(false)}>
+                        <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+                            className="bg-[#0F1729] border border-gray-800 rounded-3xl w-full max-w-sm"
+                            onClick={e => e.stopPropagation()}>
+                            <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+                                <h2 className="text-xl font-black">Manage Hours</h2>
+                                <button onClick={() => setShowCreditsModal(false)} className="text-gray-500 hover:text-white p-2 hover:bg-gray-800 rounded-xl">
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-6">
+                                <div className="text-center">
+                                    <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-3 border border-amber-500/20">
+                                        <Clock size={24} className="text-amber-500" />
+                                    </div>
+                                    <h3 className="font-bold text-white">{selectedUser.name}</h3>
+                                    <p className="text-xs text-gray-500">{selectedUser.email}</p>
+                                    <div className="mt-4 p-3 bg-[#0B1120] rounded-2xl border border-gray-800 inline-block">
+                                        <span className="text-xs text-gray-500 font-bold uppercase block mb-1">Current Balance</span>
+                                        <span className="text-2xl font-black text-cyan-400">{selectedUser.mentoringHoursRemaining || 0} Hours</span>
+                                    </div>
+                                </div>
+
+                                <Field label="Add More Hours">
+                                    <div className="flex gap-2">
+                                        {[6, 12, 24].map(amt => (
+                                            <button key={amt} onClick={() => setCreditAmount(amt)}
+                                                className={`flex-1 py-2 rounded-xl text-xs font-black transition-all border ${creditAmount === amt ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-[#0B1120] text-gray-400 border-gray-800 hover:border-gray-600'}`}>
+                                                +{amt}h
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <input type="number" value={creditAmount} onChange={e => setCreditAmount(parseInt(e.target.value) || 0)} className="w-full mt-3 bg-[#0B1120] border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-cyan-500/50 focus:outline-none" placeholder="Enter custom amount..." />
+                                </Field>
+
+                                <button onClick={handleSaveCredits} disabled={savingCredits}
+                                    className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl transition-all shadow-[0_4px_15px_rgba(245,158,11,0.3)] disabled:opacity-50 flex items-center justify-center gap-2">
+                                    {savingCredits ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
+                                    Update Credits
+                                </button>
                             </div>
                         </motion.div>
                     </motion.div>

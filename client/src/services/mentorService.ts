@@ -30,6 +30,14 @@ export interface Mentor {
     createdAt: string;
 }
 
+export interface Availability {
+    id: string;
+    mentorId: string;
+    startTime: string;
+    endTime: string;
+    isBooked: boolean;
+}
+
 export const getMentors = async (filters?: { board?: string; standard?: string; language?: string }): Promise<Mentor[]> => {
     const params = new URLSearchParams();
     if (filters?.board) params.append('board', filters.board);
@@ -72,13 +80,19 @@ export const deleteMentor = async (id: string): Promise<void> => {
     if (!res.ok) throw new Error('Failed to delete mentor');
 };
 
-export const requestMeeting = async (mentorId: string, message: string): Promise<{ message: string }> => {
+export const requestMeeting = async (mentorId: string, message: string, availabilityId: string): Promise<{ message: string; session: any; hoursRemaining: number }> => {
     const res = await fetch(`${API_BASE}/mentors/${mentorId}/request`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ message })
+        body: JSON.stringify({ message, availabilityId })
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+    return res.json();
+};
+
+export const getMentorAvailability = async (mentorId: string): Promise<Availability[]> => {
+    const res = await fetch(`${API_BASE}/mentors/${mentorId}/availability`, { headers: authHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch availability');
     return res.json();
 };
 

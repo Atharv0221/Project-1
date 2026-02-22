@@ -17,6 +17,7 @@ interface User {
     schoolName?: string;
     board?: string;
     emailVerified?: boolean;
+    mentoringHoursRemaining?: number;
 }
 
 interface AuthState {
