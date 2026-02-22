@@ -29,7 +29,7 @@
   },
   "scripts": {
     "start": "node dist/server.js",
-    "build": "tsc",
+    "build": "prisma generate && prisma db push --accept-data-loss && tsc",
     "dev": "tsx watch server.ts",
     "seed": "npx prisma db seed",
     "postinstall": "prisma generate",
