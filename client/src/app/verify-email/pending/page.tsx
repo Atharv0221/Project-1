@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Mail, Loader2, CheckCircle, RefreshCcw } from 'lucide-react';
 import Link from 'next/link';
 
-export default function VerifyPendingPage() {
+function VerifyPendingContent() {
     const searchParams = useSearchParams();
     const email = searchParams.get('email') || '';
     const [resending, setResending] = useState(false);
@@ -89,6 +89,18 @@ export default function VerifyPendingPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function VerifyPendingPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-[#0B1120] flex items-center justify-center p-6">
+                <Loader2 size={36} className="animate-spin text-cyan-400" />
+            </div>
+        }>
+            <VerifyPendingContent />
+        </Suspense>
     );
 }
 
