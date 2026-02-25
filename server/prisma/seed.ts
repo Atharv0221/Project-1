@@ -1,11 +1,49 @@
 import { PrismaClient } from '@prisma/client';
 import { mathChaptersData } from './mathChapters.js';
 import { scienceChaptersData } from './scienceChapters.js';
+import { englishChaptersData } from './englishChapters.js';
+import { socialScienceChaptersData } from './socialScienceChapters.js';
 
 const prisma = new PrismaClient();
 
 async function main() {
     console.log('Seeding database with DETAILED usage...');
+
+    // Clear existing data to ensure fresh seed with new difficulty levels
+    console.log('Clearing existing data...');
+    const subjectsToClear = ['Mathematics', 'Science', 'English', 'Social Science'];
+    await prisma.question.deleteMany({
+        where: {
+            level: {
+                chapter: {
+                    subject: {
+                        name: { in: subjectsToClear }
+                    }
+                }
+            }
+        }
+    });
+    await prisma.level.deleteMany({
+        where: {
+            chapter: {
+                subject: {
+                    name: { in: subjectsToClear }
+                }
+            }
+        }
+    });
+    await prisma.chapter.deleteMany({
+        where: {
+            subject: {
+                name: { in: subjectsToClear }
+            }
+        }
+    });
+    await prisma.subject.deleteMany({
+        where: {
+            name: { in: subjectsToClear }
+        }
+    });
 
     // HELPER to create Levels and Questions
     async function createLevels(chapterId: string, levelsData: any[]) {
@@ -76,6 +114,44 @@ async function main() {
             where: { subjectId_name: { subjectId: scienceSubject.id, name: ch.name } },
             update: { youtubeLink: ch.youtubeLink },
             create: { name: ch.name, subjectId: scienceSubject.id, order: ch.order, youtubeLink: ch.youtubeLink }
+        });
+        await createLevels(chapter.id, ch.levels);
+    }
+
+    // --- ENGLISH (Standard 8) ---
+    const englishSubject = await prisma.subject.upsert({
+        where: { name_standard: { name: 'English', standard: '8' } },
+        update: {},
+        create: { name: 'English', standard: '8' }
+    });
+
+    console.log('Processing English...');
+
+    for (const ch of englishChaptersData) {
+        console.log(`Chapter: ${ch.name}`);
+        const chapter = await prisma.chapter.upsert({
+            where: { subjectId_name: { subjectId: englishSubject.id, name: ch.name } },
+            update: {},
+            create: { name: ch.name, subjectId: englishSubject.id, order: ch.order }
+        });
+        await createLevels(chapter.id, ch.levels);
+    }
+
+    // --- SOCIAL SCIENCE (Standard 8) ---
+    const socialScienceSubject = await prisma.subject.upsert({
+        where: { name_standard: { name: 'Social Science', standard: '8' } },
+        update: {},
+        create: { name: 'Social Science', standard: '8' }
+    });
+
+    console.log('Processing Social Science...');
+
+    for (const ch of socialScienceChaptersData) {
+        console.log(`Chapter: ${ch.name}`);
+        const chapter = await prisma.chapter.upsert({
+            where: { subjectId_name: { subjectId: socialScienceSubject.id, name: ch.name } },
+            update: {},
+            create: { name: ch.name, subjectId: socialScienceSubject.id, order: ch.order }
         });
         await createLevels(chapter.id, ch.levels);
     }
