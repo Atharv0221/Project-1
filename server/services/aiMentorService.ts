@@ -1,33 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
-import { Ollama } from 'ollama';
 import dotenv from 'dotenv';
 
 dotenv.config();
-
-// Ollama Setup
-const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
-const ollamaModel = process.env.OLLAMA_MODEL || 'qwen2.5:0.5b';
-const ollama = new Ollama({ host: ollamaHost });
-
-// Ollama Speed Options — read from .env for easy tuning without code changes
-const OLLAMA_FAST_OPTIONS = {
-    num_predict: parseInt(process.env.OLLAMA_NUM_PREDICT || '120'),  // Max tokens (lower = faster)
-    num_ctx: parseInt(process.env.OLLAMA_NUM_CTX || '512'),          // Context window (smaller = faster)
-    temperature: 0.3,   // More deterministic, less randomness
-    top_k: 20,          // Restrict vocab sampling
-    top_p: 0.8,
-    num_thread: 8,      // Use more CPU threads for faster local inference
-};
-
-// For end-of-quiz deep report — allow more tokens but still optimized
-const OLLAMA_REPORT_OPTIONS = {
-    num_predict: parseInt(process.env.OLLAMA_NUM_PREDICT || '120') * 3, // 3x for full report
-    num_ctx: parseInt(process.env.OLLAMA_NUM_CTX || '512') * 2,         // 2x context for report
-    temperature: 0.3,
-    top_k: 20,
-    top_p: 0.8,
-};
 
 // Gemini Setup
 const geminiApiKeys = (process.env.GEMINI_API_KEY || '').split(',').map(key => key.trim()).filter(key => key !== '');
@@ -37,27 +12,37 @@ const genAIs = geminiApiKeys.map(key => new GoogleGenerativeAI(key));
 const openaiApiKeys = (process.env.OPENAI_API_KEY || '').split(',').map(key => key.trim()).filter(key => key !== '');
 const openais = openaiApiKeys.map(key => new OpenAI({ apiKey: key }));
 
+// Ollama Setup (OpenAI-compatible)
+const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434/v1';
+const ollamaModel = process.env.OLLAMA_MODEL || 'llama3.2:1b';
+const ollama = new OpenAI({
+    baseURL: ollamaBaseUrl,
+    apiKey: 'ollama', // Required by library but not used by Ollama
+});
+
 // Fallback logic for when AI is unavailable
 const DEFAULT_FALLBACK_RESPONSE = "I'm currently resting to sharpen my knowledge! I'll be back in a moment to help you with your questions. In the meantime, why not try one of the practice quizzes?";
 
 /**
- * Universal call helper that tries Ollama first, then Gemini, then OpenAI
+ * Universal call helper that tries Ollama first, then OpenAI keys, then Gemini
  */
 const callAIProviders = async (
     ollamaOp: () => Promise<any>,
     geminiOp: (genAI: GoogleGenerativeAI) => Promise<any>,
-    openaiOp: (openai: OpenAI) => Promise<any>
+    openaiOp: (openai: OpenAI, model?: string) => Promise<any>
 ) => {
     let lastError: any = null;
 
-    // 1. Try Ollama (Local) first
-    try {
-        console.log(`Trying Ollama (${ollamaModel})...`);
-        return await ollamaOp();
-    } catch (error: any) {
-        lastError = error;
-        console.error(`Ollama Error:`, error.message);
-        // If Ollama fails, fall back to other providers
+    // 1. Try Ollama (Local & Fast)
+    if (process.env.OLLAMA_BASE_URL) {
+        try {
+            console.log(`Trying Ollama (${ollamaModel})...`);
+            return await openaiOp(ollama, ollamaModel);
+        } catch (error: any) {
+            lastError = error;
+            console.error(`Ollama Error:`, error.message);
+            // Continue to cloud providers if Ollama fails
+        }
     }
 
     // 2. Try OpenAI keys if available
@@ -68,7 +53,6 @@ const callAIProviders = async (
         } catch (error: any) {
             lastError = error;
             console.error(`OpenAI Error (Key ${i + 1}):`, error.message);
-            // If it's a quota issue (429), try next key
             if (error.status === 429 || error.status === 500 || error.status === 503) continue;
         }
     }
@@ -81,7 +65,6 @@ const callAIProviders = async (
         } catch (error: any) {
             lastError = error;
             console.error(`Gemini Error (Key ${i + 1}):`, error.status || error.message);
-            // If it's a quota issue (429), try next key
             if (error.status === 429 || error.status === 503 || error.status === 500) continue;
         }
     }
@@ -102,15 +85,8 @@ Weak areas: ${weakTopics}. Answer helpfully and briefly.`;
     try {
         return await callAIProviders(
             async () => {
-                const response = await ollama.chat({
-                    model: ollamaModel,
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt }
-                    ],
-                    options: OLLAMA_FAST_OPTIONS,
-                });
-                return response.message.content;
+                // Not used directly — Ollama uses the openaiOp path
+                throw new Error('Use openaiOp for Ollama');
             },
             async (genAI) => {
                 const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
@@ -123,9 +99,9 @@ Weak areas: ${weakTopics}. Answer helpfully and briefly.`;
                 const result = await chat.sendMessage(userPrompt);
                 return (await result.response).text();
             },
-            async (openaiClient) => {
+            async (openaiClient, modelOverride) => {
                 const response = await openaiClient.chat.completions.create({
-                    model: "gpt-4o-mini",
+                    model: modelOverride || "gpt-4o-mini",
                     messages: [
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userPrompt }
@@ -153,13 +129,7 @@ Respond ONLY with this JSON (no extra text):
     try {
         return await callAIProviders(
             async () => {
-                const response = await ollama.chat({
-                    model: ollamaModel,
-                    messages: [{ role: 'user', content: prompt }],
-                    format: 'json',
-                    options: OLLAMA_REPORT_OPTIONS,
-                });
-                return JSON.parse(response.message.content || '{}');
+                throw new Error('Use openaiOp for Ollama');
             },
             async (genAI) => {
                 const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
@@ -169,13 +139,16 @@ Respond ONLY with this JSON (no extra text):
                 const jsonEnd = text.lastIndexOf('}');
                 return JSON.parse(text.substring(jsonStart, jsonEnd + 1));
             },
-            async (openaiClient) => {
+            async (openaiClient, modelOverride) => {
                 const response = await openaiClient.chat.completions.create({
-                    model: "gpt-4o-mini",
+                    model: modelOverride || "gpt-4o-mini",
                     messages: [{ role: "user", content: prompt }],
-                    response_format: { type: "json_object" }
+                    response_format: modelOverride ? undefined : { type: "json_object" }
                 });
-                return JSON.parse(response.choices[0].message.content || '{}');
+                const content = response.choices[0].message.content || '{}';
+                const jsonStart = content.indexOf('{');
+                const jsonEnd = content.lastIndexOf('}');
+                return JSON.parse(content.substring(jsonStart, jsonEnd + 1));
             }
         );
     } catch (error) {
@@ -190,23 +163,40 @@ Respond ONLY with this JSON (no extra text):
 };
 
 export const generateQuizFeedback = async (score: number, subjectName: string, chapterName: string, levelName: string, wrongAnswers: any[]) => {
-    const wrongTopics = wrongAnswers.map((q: any) => q.question.subtopic?.name || q.question.difficulty).filter((v, i, a) => a.indexOf(v) === i);
+    // Micro-level analysis: Group wrong answers by subtopic
+    const subtopicStatus = wrongAnswers.reduce((acc: any, curr: any) => {
+        const subtopic = curr.question.subtopic?.name || 'General';
+        acc[subtopic] = (acc[subtopic] || 0) + 1;
+        return acc;
+    }, {});
 
-    const prompt = `Quiz result: ${subjectName} > ${chapterName} (${levelName}), Score: ${score}%.
-Wrong topics: ${wrongTopics.join(', ') || 'None'}.
-Respond ONLY with this JSON:
-{"feedback":"2-sentence encouragement.","recommendations":"- Topic: https://www.youtube.com/results?search_query=Topic"}`;
+    const wrongSubtopicsStr = Object.entries(subtopicStatus)
+        .map(([name, count]) => `${name} (${count} errors)`)
+        .join(', ');
+
+    const prompt = `Analyze a student's performance in a quiz. 
+    Subject: ${subjectName}
+    Chapter: ${chapterName}
+    Level: ${levelName}
+    Score: ${score}%
+    
+    Micro-Level Analysis (Subtopic Errors): ${wrongSubtopicsStr || 'None. Perfect score!'}
+    
+    Tasks:
+    1. Provide 2-3 sentences of encouraging, personalized feedback as 'Yatsya'.
+    2. Identify specific micro-topics (subtopics) they should revise based on the errors.
+    3. Provide 2-3 relevant YouTube search links for these specific subtopics.
+    
+    Format as JSON: 
+    { 
+        "feedback": "Encouraging feedback text here.",
+        "recommendations": "List of subtopics and links like: \\n- Subtopic A: https://www.youtube.com/results?search_query=Subtopic+A\\n- Subtopic B: https://www.youtube.com/results?search_query=Subtopic+B"
+    }`;
 
     try {
         return await callAIProviders(
             async () => {
-                const response = await ollama.chat({
-                    model: ollamaModel,
-                    messages: [{ role: 'user', content: prompt }],
-                    format: 'json',
-                    options: OLLAMA_FAST_OPTIONS,
-                });
-                return JSON.parse(response.message.content || '{}');
+                throw new Error('Use openaiOp for Ollama');
             },
             async (genAI) => {
                 const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
@@ -216,13 +206,16 @@ Respond ONLY with this JSON:
                 const jsonEnd = text.lastIndexOf('}');
                 return JSON.parse(text.substring(jsonStart, jsonEnd + 1));
             },
-            async (openaiClient) => {
+            async (openaiClient, modelOverride) => {
                 const response = await openaiClient.chat.completions.create({
-                    model: "gpt-4o-mini",
+                    model: modelOverride || "gpt-4o-mini",
                     messages: [{ role: "user", content: prompt }],
-                    response_format: { type: "json_object" }
+                    response_format: modelOverride ? undefined : { type: "json_object" }
                 });
-                return JSON.parse(response.choices[0].message.content || '{}');
+                const content = response.choices[0].message.content || '{}';
+                const jsonStart = content.indexOf('{');
+                const jsonEnd = content.lastIndexOf('}');
+                return JSON.parse(content.substring(jsonStart, jsonEnd + 1));
             }
         );
     } catch (error) {
@@ -233,29 +226,60 @@ Respond ONLY with this JSON:
     }
 };
 
-export const generateRemediation = async (question: any, type: 'UPGRADE' | 'DOWNGRADE') => {
-    const prompt = type === 'UPGRADE'
-        ? `Q: "${question.content}" Answer: "${question.options[question.correctOption]}". Student got it fast. Give a 2-sentence deep-dive: explain WHY it's correct + one real-world application. Be concise.`
-        : `Q: "${question.content}" Answer: "${question.options[question.correctOption]}". Student struggled. Give a 2-sentence micro-lesson: simple analogy + how to remember it. Be encouraging.`;
+export const generateRemediation = async (question: any, type: 'UPGRADE' | 'DOWNGRADE' | 'NONE') => {
+    const subtopic = question.subtopic?.name || 'this topic';
+    const chapter = question.level?.chapter?.name || '';
+
+    const contextStr = chapter ? `in Chapter "${chapter}", specifically on "${subtopic}"` : `on "${subtopic}"`;
+
+    let prompt = '';
+
+    if (type === 'UPGRADE') {
+        prompt = `The student answered this question correctly and quickly! (Fast Learner)
+           Question: "${question.content}"
+           Correct Answer: "${question.options[question.correctOption]}"
+           Context: They are studying ${contextStr}.
+           
+           Task: Provide a "Deep Dive" enrichment as 'Yatsya'. 
+           1. Briefly explain the scientific "Why" behind the answer.
+           2. Mention a fascinating real-world application or extreme example of this concept.
+           Keep it concise (3-4 sentences) and very premium.`;
+    } else if (type === 'DOWNGRADE') {
+        prompt = `The student struggled with this question.
+           Question: "${question.content}"
+           Correct Answer: "${question.options[question.correctOption]}"
+           Context: They are studying ${contextStr}.
+           
+           Task: Provide a "Micro-Lesson" as 'Yatsya'.
+           1. Use a simple, relatable analogy for this specific concept.
+           2. Give a 2-step breakdown to remember/solve this next time.
+           Keep it encouraging, very simple, and concise (3-4 sentences).`;
+    } else {
+        // type === 'NONE' or default
+        prompt = `The student answered this question correctly.
+           Question: "${question.content}"
+           Correct Answer: "${question.options[question.correctOption]}"
+           Context: They are studying ${contextStr}.
+           
+           Task: Provide a "Reinforcement Tip" as 'Yatsya'.
+           1. Mention one related key fact or a "Did you know?" about this subtopic.
+           2. Briefly explain why this concept is important to the rest of the chapter.
+           Keep it encouraging and very concise (2-3 sentences).`;
+    }
 
     try {
         return await callAIProviders(
             async () => {
-                const response = await ollama.chat({
-                    model: ollamaModel,
-                    messages: [{ role: 'user', content: prompt }],
-                    options: OLLAMA_FAST_OPTIONS,
-                });
-                return response.message.content;
+                throw new Error('Use openaiOp for Ollama');
             },
             async (genAI) => {
                 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-lite" });
                 const result = await model.generateContent(prompt);
                 return (await result.response).text();
             },
-            async (openaiClient) => {
+            async (openaiClient, modelOverride) => {
                 const response = await openaiClient.chat.completions.create({
-                    model: "gpt-4o-mini",
+                    model: modelOverride || "gpt-4o-mini",
                     messages: [{ role: "user", content: prompt }]
                 });
                 return response.choices[0].message.content;

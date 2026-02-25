@@ -124,44 +124,41 @@ export default function QuizPage() {
 
             setFeedback({
                 isCorrect: res.isCorrect,
-                text: res.feedback,
+                text: res.isCorrect ? 'Correct!' : 'Incorrect Answer',
                 correctOption: res.correctOption
             });
 
-            // --- ADAPTIVE LOGIC & REMEDIATION ---
-            if (res.adaptiveAction !== 'NONE') {
-                setIsLoadingRemediation(true);
-                fetchRemediation(currentQ.id, res.adaptiveAction)
-                    .then(data => setRemediation(data.remediation))
-                    .catch(err => console.error("Remediation fetch error:", err))
-                    .finally(() => setIsLoadingRemediation(false));
+            // Always use the AI-generated feedback from the submit response
+            setRemediation(res.feedback);
 
+            // Trigger adaptive level logic toast if applicable
+            if (res.adaptiveAction !== 'NONE') {
                 if (res.adaptiveAction === 'UPGRADE') {
                     setToast({ message: "Leveling Up! 🚀 Skipping to Challenge Mode", type: 'success' });
-                    const challengeQ = await getAdaptiveQuestion({
+                    getAdaptiveQuestion({
                         difficulty: 'CHALLENGE',
                         chapterId: res.chapterId,
                         sessionId
-                    });
-
-                    setQuestions(prev => {
-                        const nextQ = [...prev.slice(0, currentIndex + 1)];
-                        return [...nextQ, challengeQ];
+                    }).then(challengeQ => {
+                        setQuestions(prev => {
+                            const nextQ = [...prev.slice(0, currentIndex + 1)];
+                            return [...nextQ, challengeQ];
+                        });
                     });
                 } else if (res.adaptiveAction === 'DOWNGRADE') {
                     setToast({ message: "Practice makes perfect! Here is an easier one.", type: 'warning' });
-                    const easyQ = await getAdaptiveQuestion({
+                    getAdaptiveQuestion({
                         difficulty: 'EASY',
                         chapterId: res.chapterId,
                         sessionId
-                    });
-                    setQuestions(prev => {
-                        const newQs = [...prev];
-                        newQs.splice(currentIndex + 1, 0, easyQ);
-                        return newQs;
+                    }).then(easyQ => {
+                        setQuestions(prev => {
+                            const newQs = [...prev];
+                            newQs.splice(currentIndex + 1, 0, easyQ);
+                            return newQs;
+                        });
                     });
                 }
-
                 setTimeout(() => setToast(null), 3000);
             }
         } catch (error) {
@@ -297,7 +294,7 @@ export default function QuizPage() {
                             <div className={`text-xl font-bold mb-1 ${feedback?.isCorrect ? 'text-green-400' : 'text-red-400'}`}>
                                 {feedback?.isCorrect ? 'Correct Answer!' : 'Incorrect Answer'}
                             </div>
-                            <p className="text-gray-400 line-clamp-2">{feedback?.text}</p>
+                            <p className="text-gray-400">{feedback?.text}</p>
                         </div>
                         <button
                             onClick={nextQuestion}

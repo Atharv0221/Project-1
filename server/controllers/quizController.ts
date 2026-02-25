@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db.js';
-import { generateQuizFeedback } from '../services/aiMentorService.js';
+import { generateQuizFeedback, generateRemediation } from '../services/aiMentorService.js';
 
 // Start a quiz session
 export const startQuizSession = async (req: Request, res: Response) => {
@@ -68,7 +68,10 @@ export const submitAnswer = async (req: Request, res: Response) => {
     try {
         const question = await prisma.question.findUnique({
             where: { id: questionId },
-            include: { level: { include: { chapter: true } } }
+            include: {
+                level: { include: { chapter: true } },
+                subtopic: true
+            }
         });
         if (!question) return res.status(404).json({ message: 'Question not found' });
 
@@ -116,12 +119,20 @@ export const submitAnswer = async (req: Request, res: Response) => {
             }
         }
 
-        // Return feedback immediately
-        const feedback = isCorrect ? question.rightFeedback : question.wrongFeedback;
+        // --- AI REMEDIATION / FEEDBACK ---
+        // We use 'UPGRADE' for fast correct answers, 'DOWNGRADE' for wrong answers, 
+        // and 'NONE' (mapped to standard explanation) for normal correct answers.
+        const remediationType = isCorrect
+            ? (adaptiveAction === 'UPGRADE' ? 'UPGRADE' : 'NONE')
+            : 'DOWNGRADE';
+
+        const aiFeedback = await generateRemediation(question, remediationType);
+
         res.json({
             isCorrect,
             correctOption: question.correctOption,
-            feedback: feedback || (isCorrect ? 'Correct!' : 'Incorrect.'),
+            feedback: aiFeedback, // AI generated live
+            staticFeedback: isCorrect ? question.rightFeedback : question.wrongFeedback,
             adaptiveAction,
             chapterId: question.level?.chapterId,
             subtopicId: question.subtopicId
