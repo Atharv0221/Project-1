@@ -12,12 +12,14 @@ import nodemailer from 'nodemailer';
 // Configure Nodemailer (Using environment variables)
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
+    port: 587,
+    secure: false,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
-    }
+    },
+    connectionTimeout: 10000,  // 10s connection timeout
+    socketTimeout: 10000,      // 10s socket timeout
 });
 
 console.log('Initializing SMTP with user:', process.env.EMAIL_USER);
