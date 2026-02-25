@@ -11,10 +11,15 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Ensure uploads directory exists
+// Ensure uploads directory exists (local only, skip on Vercel read-only FS)
+const isVercel = process.env.VERCEL === '1';
 const uploadsDir = path.resolve(__dirname, './uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+if (!isVercel && !fs.existsSync(uploadsDir)) {
+    try {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+    } catch (err) {
+        console.warn('Skipping local upload dir creation:', err.message);
+    }
 }
 
 const app = express();
