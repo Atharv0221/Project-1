@@ -68,13 +68,19 @@ export const register = async (req: Request, res: Response) => {
         console.log('User created successfully:', user.id);
 
         // Send verification email (non-blocking)
-        sendVerificationEmail(email, name, verificationToken).catch(err =>
-            console.error('Failed to send verification email:', err)
-        );
+        try {
+            sendVerificationEmail(email, name, verificationToken).catch(err => {
+                console.error(`[AUTH] Failed to send verification email to ${email}:`, err.message);
+            });
+        } catch (mailTriggerError) {
+            console.error('[AUTH] Immediate error triggering email:', mailTriggerError);
+        }
 
         const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, {
             expiresIn: '1h',
         });
+
+        console.log(`[AUTH] Registration complete for ${email}. Returning token.`);
 
         res.status(201).json({
             token,
@@ -91,9 +97,23 @@ export const register = async (req: Request, res: Response) => {
                 emailVerified: user.emailVerified,
             }
         });
-    } catch (error) {
-        console.error('Registration error:', error);
-        res.status(500).json({ message: 'Server error', error });
+    } catch (error: any) {
+        console.error('[AUTH] Registration error:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code,
+            meta: error.meta
+        });
+
+        // Handle specific Prisma errors
+        if (error.code === 'P2002') {
+            return res.status(400).json({ message: 'A user with this email already exists.' });
+        }
+
+        res.status(500).json({
+            message: 'Registration failed on server.',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 };
 
